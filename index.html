@@ -317,8 +317,10 @@ document.addEventListener('DOMContentLoaded',function(){
         <div class="hero-user"><span id="user-name"></span><button class="logout-btn" onclick="signOut()">Abmelden</button></div>
         <div style="display:flex;align-items:center;gap:8px;margin-top:4px">
           <div style="font-size:10px;color:var(--text-muted);font-family:'Space Grotesk',sans-serif;letter-spacing:0.04em" id="version-display"></div>
-          <button onclick="openBacklogPicker()" style="font-size:10px;color:var(--accent);background:var(--accent-dim);border:1px solid rgba(108,92,231,0.25);border-radius:20px;padding:3px 10px;cursor:pointer;font-family:'DM Sans',sans-serif;font-weight:600;white-space:nowrap">📅 Nachtragen</button>
-          <input type="date" id="backlog-picker" style="position:absolute;opacity:0;width:0;height:0;pointer-events:none" onchange="handleBacklogDate(this.value)">
+          <label style="position:relative;display:inline-block;cursor:pointer">
+            <span style="font-size:10px;color:var(--accent);background:var(--accent-dim);border:1px solid rgba(108,92,231,0.25);border-radius:20px;padding:3px 10px;font-family:'DM Sans',sans-serif;font-weight:600;white-space:nowrap;display:inline-block">📅 Nachtragen</span>
+            <input type="date" id="backlog-picker" onchange="handleBacklogDate(this.value)" style="position:absolute;top:0;left:0;width:100%;height:100%;opacity:0;cursor:pointer;-webkit-appearance:none">
+          </label>
         </div>
       </div>
     </div>
@@ -611,6 +613,7 @@ function initUI() {
     currentSession.notes = e.target.value;
     scheduleSave();
   });
+  document.getElementById('backlog-picker').max = todayKey;
   render();
 }
 
