@@ -73,15 +73,15 @@ html,body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-seri
 .wd{flex:1;height:40px;display:flex;align-items:center;justify-content:center;font-family:'Space Grotesk',sans-serif;font-size:12px;font-weight:600;border:1px solid rgba(255,255,255,0.06);border-radius:var(--radius-sm);color:var(--text-muted);background:rgba(255,255,255,0.03);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);transition:all 0.2s}
 .wd.active{background:var(--accent);border-color:var(--accent);color:#fff;box-shadow:0 4px 20px var(--accent-glow)}
 /* STATS */
-.stats-row{display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:8px;margin-bottom:20px}
+.stats-row{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:20px}
 .stat-card{background:rgba(255,255,255,0.04);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);border:1px solid rgba(255,255,255,0.08);border-radius:var(--radius);padding:14px 8px;text-align:center;position:relative;overflow:hidden}
 .stat-card::before{content:'';position:absolute;top:0;left:0;right:0;height:1px;background:linear-gradient(90deg,transparent,rgba(255,255,255,0.12),transparent)}
 .stat-num{font-family:'Space Grotesk',sans-serif;font-size:22px;font-weight:700;color:#fff}
 .stat-lbl{font-size:10px;color:var(--text-secondary);margin-top:4px;font-weight:500}
-.backlog-card{cursor:pointer;transition:all 0.2s;border-color:rgba(245,158,66,0.25);background:rgba(245,158,66,0.08)}
-.backlog-card:active{transform:scale(0.96);background:rgba(245,158,66,0.18)}
-.backlog-card .stat-num{font-size:20px}
-.backlog-card .stat-lbl{color:#f59e42;font-weight:600}
+/* BACKLOG BUTTON */
+.backlog-btn{width:100%;padding:12px 16px;margin-bottom:12px;background:rgba(245,158,66,0.1);border:1px solid rgba(245,158,66,0.3);border-radius:var(--radius);font-family:'Space Grotesk',sans-serif;font-size:13px;font-weight:600;color:#f59e42;cursor:pointer;transition:all 0.15s;display:flex;align-items:center;justify-content:center;gap:6px;-webkit-tap-highlight-color:transparent}
+.backlog-btn:hover{background:rgba(245,158,66,0.16)}
+.backlog-btn:active{transform:scale(0.98);background:rgba(245,158,66,0.22)}
 /* SECTION */
 .sec-label{font-family:'Space Grotesk',sans-serif;font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.12em;font-weight:600;margin:16px 0 8px;display:flex;align-items:center;gap:10px}
 .sec-label::after{content:'';flex:1;height:1px;background:var(--border)}
@@ -331,15 +331,11 @@ document.addEventListener('DOMContentLoaded',function(){
     </div>
     <div class="sync-bar" id="sync-bar">Bereit</div>
     <div class="weekrow" id="weekdays"></div>
+    <button class="backlog-btn" onclick="openBacklogDateModal()">📅 Vergangenes Training erfassen</button>
     <div class="stats-row">
       <div class="stat-card"><div class="stat-num" id="stat-ex">0</div><div class="stat-lbl">Übungen</div></div>
       <div class="stat-card"><div class="stat-num" id="stat-sets">0</div><div class="stat-lbl">Sätze</div></div>
       <div class="stat-card"><div class="stat-num" id="stat-vol">0</div><div class="stat-lbl">kg Total</div></div>
-      <label class="stat-card backlog-card">
-        <div class="stat-num">📅</div>
-        <div class="stat-lbl">Erfassen</div>
-        <input type="date" id="backlog-picker" onchange="handleBacklogDate(this.value)" style="position:absolute;top:0;left:0;width:100%;height:100%;opacity:0;cursor:pointer;-webkit-appearance:none">
-      </label>
     </div>
     <div class="sec-label">Übungen</div>
     <div id="exercise-list"></div>
@@ -484,6 +480,16 @@ document.addEventListener('DOMContentLoaded',function(){
       <button class="custom-add-btn" id="backlog-custom-btn" onclick="addBacklogCustomExercise()">+ Neu</button>
     </div>
     <div id="backlog-exercise-options"></div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="backlog-date-modal-overlay" onclick="closeBacklogDateModalOverlay(event)">
+  <div class="modal" onclick="event.stopPropagation()" style="border-top-color:#f59e42">
+    <button class="modal-close" onclick="closeBacklogDateModal()">×</button>
+    <div class="modal-title" style="color:#f59e42">📅 Vergangenes Training erfassen</div>
+    <div style="font-size:13px;color:var(--text-secondary);margin-bottom:16px">Für welches Datum möchtest du ein Training eintragen?</div>
+    <input type="date" id="backlog-date-input" style="width:100%;padding:14px 16px;background:var(--surface2);color:var(--text);border:1px solid var(--border);border-radius:var(--radius-sm);font-size:16px;font-family:'DM Sans',sans-serif;-webkit-appearance:none;appearance:none;outline:none;margin-bottom:16px">
+    <button onclick="confirmBacklogDate()" style="width:100%;padding:14px;background:#f59e42;border:none;border-radius:var(--radius-sm);font-family:'Space Grotesk',sans-serif;font-size:15px;font-weight:700;color:#1a1400;cursor:pointer;transition:all 0.15s">Weiter</button>
   </div>
 </div>
 
@@ -644,7 +650,6 @@ function initUI() {
     currentSession.notes = e.target.value;
     scheduleSave();
   });
-  document.getElementById('backlog-picker').max = todayKey;
   render();
 }
 
@@ -1133,10 +1138,20 @@ window.doImport = function(mode){
 let backlogKey = null;
 let backlogSession = {exercises:[], notes:''};
 
-window.handleBacklogDate = function(dateStr){
-  if(!dateStr)return;
+window.openBacklogDateModal = function(){
+  const input = document.getElementById('backlog-date-input');
+  input.max = todayKey;
+  input.value = '';
+  document.getElementById('backlog-date-modal-overlay').classList.add('open');
+};
+window.closeBacklogDateModal = function(){document.getElementById('backlog-date-modal-overlay').classList.remove('open');};
+window.closeBacklogDateModalOverlay = function(e){if(e.target===document.getElementById('backlog-date-modal-overlay'))window.closeBacklogDateModal();};
+
+window.confirmBacklogDate = function(){
+  const dateStr = document.getElementById('backlog-date-input').value;
+  if(!dateStr){alert('Bitte ein Datum auswählen.');return;}
   if(dateStr>todayKey){alert('Datum darf nicht in der Zukunft liegen.');return;}
-  document.getElementById('backlog-picker').value='';
+  window.closeBacklogDateModal();
   backlogKey = dateStr;
   backlogSession = sessions[dateStr] ? JSON.parse(JSON.stringify(sessions[dateStr])) : {exercises:[], notes:''};
   const d=new Date(dateStr+'T12:00:00');
