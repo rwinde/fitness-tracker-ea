@@ -78,10 +78,10 @@ html,body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-seri
 .stat-card::before{content:'';position:absolute;top:0;left:0;right:0;height:1px;background:linear-gradient(90deg,transparent,rgba(255,255,255,0.12),transparent)}
 .stat-num{font-family:'Space Grotesk',sans-serif;font-size:22px;font-weight:700;color:#fff}
 .stat-lbl{font-size:10px;color:var(--text-secondary);margin-top:4px;font-weight:500}
-.backlog-card{cursor:pointer;transition:all 0.2s;border-color:rgba(108,92,231,0.2)}
-.backlog-card:active{transform:scale(0.96);background:var(--accent-dim)}
+.backlog-card{cursor:pointer;transition:all 0.2s;border-color:rgba(245,158,66,0.25);background:rgba(245,158,66,0.08)}
+.backlog-card:active{transform:scale(0.96);background:rgba(245,158,66,0.18)}
 .backlog-card .stat-num{font-size:20px}
-.backlog-card .stat-lbl{color:var(--accent);font-weight:600}
+.backlog-card .stat-lbl{color:#f59e42;font-weight:600}
 /* SECTION */
 .sec-label{font-family:'Space Grotesk',sans-serif;font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.12em;font-weight:600;margin:16px 0 8px;display:flex;align-items:center;gap:10px}
 .sec-label::after{content:'';flex:1;height:1px;background:var(--border)}
@@ -337,18 +337,11 @@ document.addEventListener('DOMContentLoaded',function(){
       <div class="stat-card"><div class="stat-num" id="stat-vol">0</div><div class="stat-lbl">kg Total</div></div>
       <label class="stat-card backlog-card">
         <div class="stat-num">📅</div>
-        <div class="stat-lbl">Nachtragen</div>
+        <div class="stat-lbl">Erfassen</div>
         <input type="date" id="backlog-picker" onchange="handleBacklogDate(this.value)" style="position:absolute;top:0;left:0;width:100%;height:100%;opacity:0;cursor:pointer;-webkit-appearance:none">
       </label>
     </div>
     <div class="sec-label">Übungen</div>
-    <div id="active-date-banner" style="display:none;background:var(--gold-dim);border:1px solid rgba(240,192,64,0.3);border-radius:var(--radius-sm);padding:10px 14px;margin-bottom:10px;align-items:center;gap:10px">
-      <div style="flex:1">
-        <div style="font-size:13px;font-weight:600;color:var(--gold)">📅 Nachtragen für: <span id="active-date-label"></span></div>
-        <div style="font-size:11px;color:var(--text-secondary);margin-top:2px">Daten werden für dieses Datum gespeichert</div>
-      </div>
-      <button onclick="switchToToday()" style="background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius-xs);color:var(--text);font-size:12px;font-weight:600;padding:6px 12px;cursor:pointer;font-family:'DM Sans',sans-serif;white-space:nowrap">← Heute</button>
-    </div>
     <div id="exercise-list"></div>
     <button class="add-exercise-btn" onclick="openModal()">+ Übung hinzufügen</button>
     <div class="page-spacer"></div>
@@ -377,6 +370,23 @@ document.addEventListener('DOMContentLoaded',function(){
     <div class="week-history-section">
       <div class="week-history-title">Letzte Wochen</div>
       <div id="week-history-list"></div>
+    </div>
+  </div>
+
+  <div class="page" id="page-backlog">
+    <button class="detail-back" onclick="cancelBacklog()">← Abbrechen</button>
+    <div style="background:rgba(245,158,66,0.1);border:1px solid rgba(245,158,66,0.25);border-radius:var(--radius);padding:14px 16px;margin-bottom:16px">
+      <div style="font-family:'Space Grotesk',sans-serif;font-size:16px;font-weight:700;color:#f59e42">📅 Vergangenes Training erfassen</div>
+      <div style="font-size:13px;color:var(--text-secondary);margin-top:4px" id="backlog-date-label"></div>
+    </div>
+    <div class="sec-label">Übungen</div>
+    <div id="backlog-exercise-list"></div>
+    <button class="add-exercise-btn" onclick="openBacklogExModal()">+ Übung hinzufügen</button>
+    <div class="sec-label">Notizen</div>
+    <div class="notes-area"><textarea id="backlog-notes" placeholder="Wie lief das Training…"></textarea></div>
+    <div style="margin-top:16px;display:flex;gap:8px">
+      <button onclick="cancelBacklog()" style="flex:1;padding:14px;background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius-sm);font-family:'Space Grotesk',sans-serif;font-size:14px;font-weight:600;color:var(--text-secondary);cursor:pointer">Abbrechen</button>
+      <button onclick="saveBacklog()" style="flex:2;padding:14px;background:#f59e42;border:none;border-radius:var(--radius-sm);font-family:'Space Grotesk',sans-serif;font-size:14px;font-weight:700;color:#1a1400;cursor:pointer">Training speichern</button>
     </div>
   </div>
 
@@ -465,6 +475,18 @@ document.addEventListener('DOMContentLoaded',function(){
   </div>
 </div>
 
+<div class="modal-overlay" id="backlog-ex-modal-overlay" onclick="closeBacklogExModalOverlay(event)">
+  <div class="modal" onclick="event.stopPropagation()">
+    <button class="modal-close" onclick="closeBacklogExModal()">×</button>
+    <div class="modal-title">Übung wählen</div>
+    <div class="search-row">
+      <input class="search-input" id="backlog-search" placeholder="Suchen oder eigene eingeben…" oninput="filterBacklogExercises()">
+      <button class="custom-add-btn" id="backlog-custom-btn" onclick="addBacklogCustomExercise()">+ Neu</button>
+    </div>
+    <div id="backlog-exercise-options"></div>
+  </div>
+</div>
+
 <!-- FIREBASE -->
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
@@ -505,7 +527,6 @@ const BUILTIN=[
 
 const today = new Date();
 const todayKey = today.toISOString().split('T')[0];
-let activeKey = todayKey; // can be changed for backlog entries
 const months = ['Jan','Feb','Mär','Apr','Mai','Jun','Jul','Aug','Sep','Okt','Nov','Dez'];
 const monthsFull = ['Januar','Februar','März','April','Mai','Juni','Juli','August','September','Oktober','November','Dezember'];
 const DAYS = ['Mo','Di','Mi','Do','Fr','Sa','So'];
@@ -560,7 +581,7 @@ async function loadAllData() {
     const sessSnap = await getDocs(collection(db, 'users', currentUser.uid, 'sessions'));
     sessions = {};
     sessSnap.forEach(d => { sessions[d.id] = d.data(); });
-    currentSession = sessions[activeKey] ? JSON.parse(JSON.stringify(sessions[activeKey])) : {exercises:[], notes:''};
+    currentSession = sessions[todayKey] ? JSON.parse(JSON.stringify(sessions[todayKey])) : {exercises:[], notes:''};
     document.getElementById('notes').value = currentSession.notes || '';
     const tplSnap = await getDoc(doc(db, 'users', currentUser.uid, 'data', 'templates'));
     templates = tplSnap.exists() ? (tplSnap.data().list || []) : [];
@@ -580,8 +601,8 @@ async function saveSession() {
   if(!currentUser) return;
   setSyncStatus('syncing', '↑ Wird gespeichert…');
   try {
-    await setDoc(doc(db, 'users', currentUser.uid, 'sessions', activeKey), currentSession);
-    sessions[activeKey] = JSON.parse(JSON.stringify(currentSession));
+    await setDoc(doc(db, 'users', currentUser.uid, 'sessions', todayKey), currentSession);
+    sessions[todayKey] = JSON.parse(JSON.stringify(currentSession));
     setSyncStatus('synced', '✓ Gespeichert');
     setTimeout(() => setSyncStatus('', 'Bereit'), 1500);
   } catch(e) { setSyncStatus('error', '✗ Speichern fehlgeschlagen'); }
@@ -648,7 +669,7 @@ function allExercises(){return[...BUILTIN,...customExercises.map(n=>({name:n,mus
 function getExPR(name){
   let best=null;
   Object.entries(sessions).forEach(([k,s])=>{
-    if(k===activeKey)return;
+    if(k===todayKey)return;
     (s.exercises||[]).forEach(ex=>{
       if(ex.name===name)ex.sets.forEach(set=>{
         const kg=parseFloat(set.kg)||0,reps=parseFloat(set.reps)||0;
@@ -1108,50 +1129,134 @@ window.doImport = function(mode){
   scheduleSave();window.closeImportModal();window.showPage('today');render();
 };
 
-// ── BACKLOG / DATE SWITCHING ──
-window.openBacklogPicker = function(){
-  const picker=document.getElementById('backlog-picker');
-  picker.max=todayKey;
-  if(picker.showPicker) picker.showPicker();
-  else picker.click();
-};
+// ── BACKLOG / VERGANGENES TRAINING ERFASSEN ──
+let backlogKey = null;
+let backlogSession = {exercises:[], notes:''};
 
 window.handleBacklogDate = function(dateStr){
   if(!dateStr)return;
   if(dateStr>todayKey){alert('Datum darf nicht in der Zukunft liegen.');return;}
-  switchToDate(dateStr);
+  document.getElementById('backlog-picker').value='';
+  backlogKey = dateStr;
+  backlogSession = sessions[dateStr] ? JSON.parse(JSON.stringify(sessions[dateStr])) : {exercises:[], notes:''};
+  const d=new Date(dateStr+'T12:00:00');
+  const dayIdx=(d.getDay()+6)%7;
+  document.getElementById('backlog-date-label').textContent=DAYS_FULL[dayIdx]+', '+d.getDate()+'. '+monthsFull[d.getMonth()]+' '+d.getFullYear();
+  document.getElementById('backlog-notes').value=backlogSession.notes||'';
+  renderBacklogExercises();
+  window.showPage('backlog');
 };
 
-function switchToDate(dateKey){
-  // Save current session first if there's data
-  if(currentSession.exercises.length>0)saveSession();
-  activeKey=dateKey;
-  currentSession=sessions[activeKey]?JSON.parse(JSON.stringify(sessions[activeKey])):{exercises:[],notes:''};
-  document.getElementById('notes').value=currentSession.notes||'';
-  updateDateBanner();
-  render();
-}
-
-window.switchToToday = function(){
-  if(currentSession.exercises.length>0)saveSession();
-  activeKey=todayKey;
-  currentSession=sessions[activeKey]?JSON.parse(JSON.stringify(sessions[activeKey])):{exercises:[],notes:''};
-  document.getElementById('notes').value=currentSession.notes||'';
-  updateDateBanner();
-  render();
+window.cancelBacklog = function(){
+  backlogKey=null;
+  backlogSession={exercises:[],notes:''};
+  window.showPage('today');
 };
 
-function updateDateBanner(){
-  const banner=document.getElementById('active-date-banner');
-  if(activeKey===todayKey){
-    banner.style.display='none';
-  } else {
-    banner.style.display='flex';
-    const d=new Date(activeKey+'T12:00:00');
-    const dayIdx=(d.getDay()+6)%7;
-    document.getElementById('active-date-label').textContent=DAYS_FULL[dayIdx]+', '+d.getDate()+'. '+monthsFull[d.getMonth()]+' '+d.getFullYear();
+window.saveBacklog = async function(){
+  if(!backlogKey)return;
+  if(!backlogSession.exercises.length){alert('Bitte mindestens eine Übung hinzufügen.');return;}
+  backlogSession.notes=document.getElementById('backlog-notes').value||'';
+  setSyncStatus('syncing','↑ Wird gespeichert…');
+  try{
+    await setDoc(doc(db,'users',currentUser.uid,'sessions',backlogKey),backlogSession);
+    sessions[backlogKey]=JSON.parse(JSON.stringify(backlogSession));
+    setSyncStatus('synced','✓ Gespeichert');
+    setTimeout(()=>setSyncStatus('','Bereit'),1500);
+    backlogKey=null;backlogSession={exercises:[],notes:''};
+    window.showPage('today');
+  }catch(e){setSyncStatus('error','✗ Speichern fehlgeschlagen');console.error(e);}
+};
+
+function renderBacklogExercises(){
+  const list=document.getElementById('backlog-exercise-list');
+  list.innerHTML='';
+  backlogSession.exercises.forEach((ex,ei)=>{
+    const vol=ex.sets.reduce((s,set)=>s+(parseFloat(set.kg)||0)*(parseFloat(set.reps)||0),0);
+    const setsRows=ex.sets.map((s,si)=>{
+      const sv=(parseFloat(s.kg)||0)*(parseFloat(s.reps)||0);
+      return `<tr>
+        <td>${si+1}</td>
+        <td><input class="set-input" type="number" min="0" step="0.5" inputmode="decimal" value="${s.kg||''}" placeholder="kg" oninput="updateBacklogSet(${ei},${si},'kg',this.value)"></td>
+        <td><input class="set-input" type="number" min="0" step="1" inputmode="numeric" value="${s.reps||''}" placeholder="Wdh" oninput="updateBacklogSet(${ei},${si},'reps',this.value)"></td>
+        <td class="set-vol">${sv>0?Math.round(sv):'—'}</td>
+      </tr>`;
+    }).join('');
+    const card=document.createElement('div');
+    card.className='exercise-card';
+    card.innerHTML=`
+      <div class="exercise-header" onclick="toggleBacklogEx(${ei})">
+        <div class="exercise-name">${ex.name}</div>
+        <span class="exercise-toggle${ex.open?' open':''}">▾</span>
+      </div>
+      ${ex.open?`<div class="exercise-body">
+        <table class="sets-table"><thead><tr><th>#</th><th>KG</th><th>Wdh</th><th>Vol</th></tr></thead><tbody>${setsRows}</tbody></table>
+        <button class="add-set-btn" onclick="addBacklogSet(${ei})">+ Satz hinzufügen</button>
+        <div class="exercise-footer">
+          <div><span class="vol-lbl">Volumen</span><span class="vol-val">${Math.round(vol).toLocaleString('de')} kg</span></div>
+          <button class="remove-ex" onclick="removeBacklogEx(${ei})">Entfernen</button>
+        </div>
+      </div>`:''}`;
+    list.appendChild(card);
+  });
+  if(!backlogSession.exercises.length){
+    list.innerHTML=`<div class="empty-state">
+      <div class="empty-state-icon">📅</div>
+      <div class="empty-state-title">Training hinzufügen</div>
+      <div class="empty-state-sub">Füge Übungen für dieses<br>vergangene Training hinzu.</div>
+    </div>`;
   }
 }
+
+window.toggleBacklogEx=function(i){backlogSession.exercises[i].open=!backlogSession.exercises[i].open;renderBacklogExercises();};
+window.updateBacklogSet=function(ei,si,field,val){backlogSession.exercises[ei].sets[si][field]=val;};
+window.addBacklogSet=function(ei){backlogSession.exercises[ei].sets.push({kg:'',reps:''});renderBacklogExercises();};
+window.removeBacklogEx=function(ei){backlogSession.exercises.splice(ei,1);renderBacklogExercises();};
+
+// Backlog exercise modal
+window.openBacklogExModal=function(){
+  document.getElementById('backlog-ex-modal-overlay').classList.add('open');
+  document.getElementById('backlog-search').value='';
+  document.getElementById('backlog-custom-btn').classList.remove('visible');
+  filterBacklogExercises();
+  setTimeout(()=>document.getElementById('backlog-search').focus(),300);
+};
+window.closeBacklogExModal=function(){document.getElementById('backlog-ex-modal-overlay').classList.remove('open');};
+window.closeBacklogExModalOverlay=function(e){if(e.target===document.getElementById('backlog-ex-modal-overlay'))window.closeBacklogExModal();};
+window.filterBacklogExercises=function(){
+  const q=document.getElementById('backlog-search').value.trim(),ql=q.toLowerCase();
+  const all=allExercises();
+  const filtered=q?all.filter(e=>e.name.toLowerCase().includes(ql)||e.muscle.toLowerCase().includes(ql)):all;
+  const exactMatch=all.some(e=>e.name.toLowerCase()===ql);
+  const btn=document.getElementById('backlog-custom-btn');
+  if(q&&!exactMatch){btn.textContent=`"${q}" neu`;btn.classList.add('visible');}
+  else btn.classList.remove('visible');
+  const opts=document.getElementById('backlog-exercise-options');
+  if(!filtered.length){opts.innerHTML=`<div class="no-results">Keine Übung gefunden — oben als neue hinzufügen.</div>`;return;}
+  const grouped={};
+  filtered.forEach(e=>{if(!grouped[e.muscle])grouped[e.muscle]=[];grouped[e.muscle].push(e);});
+  let html='';
+  Object.entries(grouped).forEach(([muscle,exs])=>{
+    if(Object.keys(grouped).length>1)html+=`<div class="muscle-label">${muscle}</div>`;
+    exs.forEach(e=>{
+      const isCustom=e.muscle==='Eigene';
+      html+=`<div class="exercise-option${isCustom?' custom':''}" onclick="addBacklogExercise('${e.name.replace(/'/g,"\\'")}')">
+        <div class="exercise-option-name">${e.name}${isCustom?' <span style="font-size:10px;color:var(--accent)">✓ eigene</span>':''}</div>
+      </div>`;
+    });
+  });
+  opts.innerHTML=html;
+};
+window.addBacklogCustomExercise=async function(){
+  const q=document.getElementById('backlog-search').value.trim();
+  if(!q)return;
+  if(!customExercises.includes(q)){customExercises.push(q);await saveCustomExercises();}
+  window.addBacklogExercise(q);
+};
+window.addBacklogExercise=function(name){
+  backlogSession.exercises.push({name,open:true,sets:[{kg:'',reps:''},{kg:'',reps:''},{kg:'',reps:''}]});
+  window.closeBacklogExModal();renderBacklogExercises();
+};
 
 // ── PROGRESS ──
 function renderProgress(){
