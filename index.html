@@ -315,7 +315,11 @@ document.addEventListener('DOMContentLoaded',function(){
         <div class="hero-date" id="datedisp"></div>
         <div class="hero-month" id="monthdisp"></div>
         <div class="hero-user"><span id="user-name"></span><button class="logout-btn" onclick="signOut()">Abmelden</button></div>
-        <div style="font-size:10px;color:var(--text-muted);font-family:'Space Grotesk',sans-serif;letter-spacing:0.04em;margin-top:2px" id="version-display"></div>
+        <div style="display:flex;align-items:center;gap:8px;margin-top:4px">
+          <div style="font-size:10px;color:var(--text-muted);font-family:'Space Grotesk',sans-serif;letter-spacing:0.04em" id="version-display"></div>
+          <button onclick="openBacklogPicker()" style="font-size:10px;color:var(--accent);background:var(--accent-dim);border:1px solid rgba(108,92,231,0.25);border-radius:20px;padding:3px 10px;cursor:pointer;font-family:'DM Sans',sans-serif;font-weight:600;white-space:nowrap">📅 Nachtragen</button>
+          <input type="date" id="backlog-picker" style="position:absolute;opacity:0;width:0;height:0;pointer-events:none" onchange="handleBacklogDate(this.value)">
+        </div>
       </div>
     </div>
     <div class="sync-bar" id="sync-bar">Bereit</div>
@@ -338,10 +342,6 @@ document.addEventListener('DOMContentLoaded',function(){
     <div class="page-spacer"></div>
     <div class="sec-label">Notizen</div>
     <div class="notes-area"><textarea id="notes" placeholder="Wie lief das Training…"></textarea></div>
-    <div style="margin-top:16px">
-      <button class="add-exercise-btn" onclick="openBacklogPicker()" style="border-color:var(--border);color:var(--text-secondary);background:var(--surface)">📅 Training nachtragen</button>
-      <input type="date" id="backlog-picker" style="position:absolute;opacity:0;width:0;height:0;pointer-events:none" onchange="handleBacklogDate(this.value)">
-    </div>
   </div>
 
   <div class="page" id="page-history">
