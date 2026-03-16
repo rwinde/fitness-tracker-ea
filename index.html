@@ -318,11 +318,22 @@ if('serviceWorker' in navigator){navigator.serviceWorker.getRegistrations().then
       <div class="stat-card"><div class="stat-num" id="stat-vol">0</div><div class="stat-lbl">kg Total</div></div>
     </div>
     <div class="sec-label">Übungen</div>
+    <div id="active-date-banner" style="display:none;background:var(--gold-dim);border:1px solid rgba(240,192,64,0.3);border-radius:var(--radius-sm);padding:10px 14px;margin-bottom:10px;align-items:center;gap:10px">
+      <div style="flex:1">
+        <div style="font-size:13px;font-weight:600;color:var(--gold)">📅 Nachtragen für: <span id="active-date-label"></span></div>
+        <div style="font-size:11px;color:var(--text-secondary);margin-top:2px">Daten werden für dieses Datum gespeichert</div>
+      </div>
+      <button onclick="switchToToday()" style="background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius-xs);color:var(--text);font-size:12px;font-weight:600;padding:6px 12px;cursor:pointer;font-family:'DM Sans',sans-serif;white-space:nowrap">← Heute</button>
+    </div>
     <div id="exercise-list"></div>
     <button class="add-exercise-btn" onclick="openModal()">+ Übung hinzufügen</button>
     <div class="page-spacer"></div>
     <div class="sec-label">Notizen</div>
     <div class="notes-area"><textarea id="notes" placeholder="Wie lief das Training…"></textarea></div>
+    <div style="margin-top:16px">
+      <button class="add-exercise-btn" onclick="openBacklogPicker()" style="border-color:var(--border);color:var(--text-secondary);background:var(--surface)">📅 Training nachtragen</button>
+      <input type="date" id="backlog-picker" style="position:absolute;opacity:0;width:0;height:0;pointer-events:none" onchange="handleBacklogDate(this.value)">
+    </div>
   </div>
 
   <div class="page" id="page-history">
@@ -474,6 +485,7 @@ const BUILTIN=[
 
 const today = new Date();
 const todayKey = today.toISOString().split('T')[0];
+let activeKey = todayKey; // can be changed for backlog entries
 const months = ['Jan','Feb','Mär','Apr','Mai','Jun','Jul','Aug','Sep','Okt','Nov','Dez'];
 const monthsFull = ['Januar','Februar','März','April','Mai','Juni','Juli','August','September','Oktober','November','Dezember'];
 const DAYS = ['Mo','Di','Mi','Do','Fr','Sa','So'];
@@ -528,7 +540,7 @@ async function loadAllData() {
     const sessSnap = await getDocs(collection(db, 'users', currentUser.uid, 'sessions'));
     sessions = {};
     sessSnap.forEach(d => { sessions[d.id] = d.data(); });
-    currentSession = sessions[todayKey] ? JSON.parse(JSON.stringify(sessions[todayKey])) : {exercises:[], notes:''};
+    currentSession = sessions[activeKey] ? JSON.parse(JSON.stringify(sessions[activeKey])) : {exercises:[], notes:''};
     document.getElementById('notes').value = currentSession.notes || '';
     const tplSnap = await getDoc(doc(db, 'users', currentUser.uid, 'data', 'templates'));
     templates = tplSnap.exists() ? (tplSnap.data().list || []) : [];
@@ -548,8 +560,8 @@ async function saveSession() {
   if(!currentUser) return;
   setSyncStatus('syncing', '↑ Wird gespeichert…');
   try {
-    await setDoc(doc(db, 'users', currentUser.uid, 'sessions', todayKey), currentSession);
-    sessions[todayKey] = JSON.parse(JSON.stringify(currentSession));
+    await setDoc(doc(db, 'users', currentUser.uid, 'sessions', activeKey), currentSession);
+    sessions[activeKey] = JSON.parse(JSON.stringify(currentSession));
     setSyncStatus('synced', '✓ Gespeichert');
     setTimeout(() => setSyncStatus('', 'Bereit'), 1500);
   } catch(e) { setSyncStatus('error', '✗ Speichern fehlgeschlagen'); }
@@ -615,7 +627,7 @@ function allExercises(){return[...BUILTIN,...customExercises.map(n=>({name:n,mus
 function getExPR(name){
   let best=null;
   Object.entries(sessions).forEach(([k,s])=>{
-    if(k===todayKey)return;
+    if(k===activeKey)return;
     (s.exercises||[]).forEach(ex=>{
       if(ex.name===name)ex.sets.forEach(set=>{
         const kg=parseFloat(set.kg)||0,reps=parseFloat(set.reps)||0;
@@ -1074,6 +1086,51 @@ window.doImport = function(mode){
   else currentSession.exercises=[...currentSession.exercises,...newEx];
   scheduleSave();window.closeImportModal();window.showPage('today');render();
 };
+
+// ── BACKLOG / DATE SWITCHING ──
+window.openBacklogPicker = function(){
+  const picker=document.getElementById('backlog-picker');
+  picker.max=todayKey;
+  if(picker.showPicker) picker.showPicker();
+  else picker.click();
+};
+
+window.handleBacklogDate = function(dateStr){
+  if(!dateStr)return;
+  if(dateStr>todayKey){alert('Datum darf nicht in der Zukunft liegen.');return;}
+  switchToDate(dateStr);
+};
+
+function switchToDate(dateKey){
+  // Save current session first if there's data
+  if(currentSession.exercises.length>0)saveSession();
+  activeKey=dateKey;
+  currentSession=sessions[activeKey]?JSON.parse(JSON.stringify(sessions[activeKey])):{exercises:[],notes:''};
+  document.getElementById('notes').value=currentSession.notes||'';
+  updateDateBanner();
+  render();
+}
+
+window.switchToToday = function(){
+  if(currentSession.exercises.length>0)saveSession();
+  activeKey=todayKey;
+  currentSession=sessions[activeKey]?JSON.parse(JSON.stringify(sessions[activeKey])):{exercises:[],notes:''};
+  document.getElementById('notes').value=currentSession.notes||'';
+  updateDateBanner();
+  render();
+};
+
+function updateDateBanner(){
+  const banner=document.getElementById('active-date-banner');
+  if(activeKey===todayKey){
+    banner.style.display='none';
+  } else {
+    banner.style.display='flex';
+    const d=new Date(activeKey+'T12:00:00');
+    const dayIdx=(d.getDay()+6)%7;
+    document.getElementById('active-date-label').textContent=DAYS_FULL[dayIdx]+', '+d.getDate()+'. '+monthsFull[d.getMonth()]+' '+d.getFullYear();
+  }
+}
 
 // ── PROGRESS ──
 function renderProgress(){
