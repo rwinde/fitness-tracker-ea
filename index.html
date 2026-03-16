@@ -245,7 +245,7 @@ if('serviceWorker' in navigator){
 }
 // If loaded from cache, reload once with cache-busting param
 (function(){
-  const CURRENT = 'v1.2.0';
+  const CURRENT = 'v1.2.1';
   const stored = sessionStorage.getItem('appVersion');
   if(stored !== CURRENT){
     sessionStorage.setItem('appVersion', CURRENT);
@@ -977,7 +977,8 @@ window.filterTplExercises = function(){
   const all=allExercises();const filtered=q?all.filter(e=>e.name.toLowerCase().includes(ql)):all;
   const exactMatch=all.some(e=>e.name.toLowerCase()===ql);
   const btn=document.getElementById('tpl-custom-btn');
-  if(q&&!exactMatch){btn.textContent=`"${q}" neu`;btn.classList.add('visible');}else btn.classList.remove('visible');
+  if(q&&!exactMatch){btn.textContent=`"${q}" neu`;btn.classList.add('visible');}
+  else btn.classList.remove('visible');
   const opts=document.getElementById('tpl-exercise-options');
   if(!filtered.length){opts.innerHTML=`<div class="no-results">Keine Übung gefunden.</div>`;return;}
   const grouped={};filtered.forEach(e=>{if(!grouped[e.muscle])grouped[e.muscle]=[];grouped[e.muscle].push(e);});
@@ -989,8 +990,12 @@ window.filterTplExercises = function(){
   opts.innerHTML=html;
 };
 window.addTplCustomExercise = async function(){
-  const q=document.getElementById('tpl-search').value.trim();if(!q)return;
-  if(!customExercises.includes(q)){customExercises.push(q);await saveCustomExercises();}
+  const q=document.getElementById('tpl-search').value.trim();
+  if(!q)return;
+  if(!customExercises.includes(q)){
+    customExercises.push(q);
+    await saveCustomExercises();
+  }
   window.addTplExercise(q);
 };
 window.addTplExercise = function(name){
@@ -1011,6 +1016,23 @@ window.doImport = function(mode){
   else currentSession.exercises=[...currentSession.exercises,...newEx];
   scheduleSave();window.closeImportModal();window.showPage('today');render();
 };
+
+
+if(window.visualViewport){
+  window.visualViewport.addEventListener('resize',()=>{
+    const kbHeight = window.innerHeight - window.visualViewport.height;
+    document.querySelectorAll('.modal-overlay.open .modal').forEach(m=>{
+      m.style.marginBottom = kbHeight > 50 ? (kbHeight+8)+'px' : '0px';
+      m.style.maxHeight = Math.floor(window.visualViewport.height * 0.82)+'px';
+    });
+  });
+  window.visualViewport.addEventListener('scroll',()=>{
+    const kbHeight = window.innerHeight - window.visualViewport.height;
+    document.querySelectorAll('.modal-overlay.open .modal').forEach(m=>{
+      m.style.marginBottom = kbHeight > 50 ? (kbHeight+8)+'px' : '0px';
+    });
+  });
+}
 
 </script>
 </body>
