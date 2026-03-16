@@ -14,9 +14,9 @@
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 :root{--bg:#0e0e0e;--surface:#161616;--border:#2a2a2a;--red:#c0392b;--red-dim:#7a1f17;--gold:#c9933a;--text:#e8e8e8;--muted:#888;}
-html,body{background:var(--bg);color:var(--text);font-family:'Barlow Condensed',sans-serif;min-height:100vh}
-.app{max-width:430px;margin:0 auto;padding:env(safe-area-inset-top, 10px) 12px calc(90px + env(safe-area-inset-bottom)) 12px}
-.page{display:none}.page.active{display:block}
+html,body{background:var(--bg);color:var(--text);font-family:'Barlow Condensed',sans-serif;min-height:100vh;height:100%}
+.app{max-width:430px;margin:0 auto;min-height:100vh;padding:env(safe-area-inset-top, 10px) 12px calc(90px + env(safe-area-inset-bottom)) 12px}
+.page{display:none}.page.active{display:block;min-height:calc(100vh - 80px)}
 .bottom-nav{position:fixed;bottom:0;left:0;right:0;width:100%;background:#111;border-top:1px solid var(--border);display:flex;z-index:50;padding-bottom:env(safe-area-inset-bottom, 0px);max-width:100%}
 .nav-btn{flex:1;padding:12px 0 10px;display:flex;flex-direction:column;align-items:center;gap:3px;background:none;border:none;color:var(--muted);cursor:pointer;font-family:'Oswald',sans-serif;font-size:10px;letter-spacing:0.05em;text-transform:uppercase}
 .nav-btn.active{color:var(--red)}
@@ -229,6 +229,11 @@ body { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
 button, .exercise-option, .session-card, .template-card { -webkit-tap-highlight-color: rgba(192,57,43,0.2); }
 /* Input appearance fix for iOS */
 input[type=number] { -webkit-appearance: none; appearance: none; }
+
+.empty-state{display:flex;flex-direction:column;align-items:center;justify-content:center;padding:40px 20px;text-align:center;min-height:200px}
+.empty-state-icon{font-size:48px;margin-bottom:16px;opacity:0.3}
+.empty-state-title{font-family:'Oswald',sans-serif;font-size:16px;font-weight:500;color:#444;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:8px}
+.empty-state-sub{font-size:13px;color:#333;line-height:1.5}
 </style>
 </head>
 <body>
@@ -261,7 +266,7 @@ input[type=number] { -webkit-appearance: none; appearance: none; }
         <div class="hero-date" id="datedisp"></div>
         <div class="hero-month" id="monthdisp"></div>
         <div class="hero-user"><span id="user-name"></span><button class="logout-btn" onclick="signOut()">Abmelden</button></div>
-        <div style="font-size:9px;color:#333;margin-top:4px;font-family:'Oswald',sans-serif;letter-spacing:0.06em">v1.0.0</div>
+        <div style="font-size:9px;color:#333;margin-top:4px;font-family:'Oswald',sans-serif;letter-spacing:0.06em">v1.0.2</div>
       </div>
     </div>
     <div class="sync-bar" id="sync-bar">Bereit</div>
@@ -652,6 +657,14 @@ function render(){
       </div>`:''}`;
     list.appendChild(card);
   });
+  // Empty state
+  if(!currentSession.exercises.length){
+    list.innerHTML=`<div class="empty-state">
+      <div class="empty-state-icon">⚡</div>
+      <div class="empty-state-title">Bereit zum Training?</div>
+      <div class="empty-state-sub">Füge deine erste Übung hinzu<br>und leg los.</div>
+    </div>`;
+  }
   updateStats();
 }
 
