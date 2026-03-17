@@ -336,6 +336,10 @@ document.addEventListener('DOMContentLoaded',function(){
 <div class="app" id="main-app" style="display:none">
 
   <div class="page active" id="page-today">
+    <div style="text-align:center;margin-bottom:10px">
+      <div style="font-family:'Space Grotesk',sans-serif;font-size:11px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.18em">Fitness Tracker</div>
+      <div style="font-family:'Space Grotesk',sans-serif;font-size:16px;font-weight:700;color:var(--accent);letter-spacing:0.02em;margin-top:2px">Road to Hanma</div>
+    </div>
     <div class="hero">
       <div class="hero-img"><img id="heroImg" src="" alt="Avatar"></div>
       <div class="hero-info">
@@ -551,11 +555,19 @@ const BUILTIN=[
 ];
 
 const today = new Date();
-const todayKey = today.toISOString().split('T')[0];
+const todayKey = localDateKey(today);
 const months = ['Jan','Feb','Mär','Apr','Mai','Jun','Jul','Aug','Sep','Okt','Nov','Dez'];
 const monthsFull = ['Januar','Februar','März','April','Mai','Juni','Juli','August','September','Oktober','November','Dezember'];
 const DAYS = ['Mo','Di','Mi','Do','Fr','Sa','So'];
 const DAYS_FULL = ['Montag','Dienstag','Mittwoch','Donnerstag','Freitag','Samstag','Sonntag'];
+
+// Local timezone date key — avoids UTC shift bugs
+function localDateKey(d){
+  const y=d.getFullYear();
+  const m=String(d.getMonth()+1).padStart(2,'0');
+  const day=String(d.getDate()).padStart(2,'0');
+  return y+'-'+m+'-'+day;
+}
 
 let currentUser = null;
 let sessions = {};
@@ -921,7 +933,7 @@ function renderHistory(){
         <div class="session-date-big">${d.getDate()}</div>
         <div class="session-date-info">
           <div class="session-weekday">${DAYS_FULL[dayIdx]}</div>
-          <div class="session-month">${months[d.getMonth()]} ${d.getFullYear()}</div>
+          <div class="session-month">${d.getDate()}.${d.getMonth()+1}.${d.getFullYear()} · ${months[d.getMonth()]} ${d.getFullYear()}</div>
         </div>
         <div class="session-stats">
           <div><div class="session-stat-num">${(s.exercises||[]).length}</div><div class="session-stat-lbl">Übungen</div></div>
@@ -972,7 +984,7 @@ function getMondayOfWeek(date){
 }
 function getWeekDays(monday){
   const days=[];
-  for(let i=0;i<7;i++){const d=new Date(monday);d.setDate(d.getDate()+i);days.push(d.toISOString().split('T')[0]);}
+  for(let i=0;i<7;i++){const d=new Date(monday);d.setDate(d.getDate()+i);days.push(localDateKey(d));}
   return days;
 }
 function countTrainedDays(weekDays){
@@ -1310,7 +1322,7 @@ function renderHeatmap(){
     for(let d=0;d<7;d++){
       const date=new Date(startMonday);
       date.setDate(date.getDate()+(w*7)+d);
-      const key=date.toISOString().split('T')[0];
+      const key=localDateKey(date);
       const dayNum=date.getDate();
       const s=sessions[key];
       const exCount=s&&s.exercises?s.exercises.length:0;
@@ -1323,7 +1335,7 @@ function renderHeatmap(){
       const cell=document.createElement('div');
       cell.className='heatmap-cell'+(lvl?' '+lvl:'')+(isToday?' today-cell':'');
       cell.textContent=dayNum;
-      cell.title=key+(exCount?` — ${exCount} Übungen`:'');
+      cell.title=dayNum+'.'+(date.getMonth()+1)+'.'+(exCount?' — '+exCount+' Übungen':'');
       grid.appendChild(cell);
     }
   }
