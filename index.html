@@ -97,6 +97,9 @@ html,body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-seri
 .stat-card::before{content:'';position:absolute;top:0;left:0;right:0;height:1px;background:linear-gradient(90deg,transparent,rgba(255,255,255,0.12),transparent)}
 .stat-num{font-family:'Space Grotesk',sans-serif;font-size:24px;font-weight:700;color:#fff}
 .stat-lbl{font-size:12px;color:var(--text-secondary);margin-top:4px;font-weight:500}
+/* FINISH TRAINING */
+.finish-btn{width:100%;padding:16px;margin-top:16px;background:var(--green);border:none;border-radius:var(--radius);font-family:'Space Grotesk',sans-serif;font-size:15px;font-weight:700;color:#0a2018;cursor:pointer;transition:all 0.15s;-webkit-tap-highlight-color:transparent}
+.finish-btn:active{transform:scale(0.98);opacity:0.85}
 /* BACKLOG BUTTON */
 .backlog-btn{width:100%;padding:14px 16px;margin-bottom:12px;background:rgba(245,158,66,0.1);border:1px solid rgba(245,158,66,0.3);border-radius:var(--radius);font-family:'Space Grotesk',sans-serif;font-size:14px;font-weight:600;color:#f59e42;cursor:pointer;transition:all 0.15s;display:flex;align-items:center;justify-content:center;gap:6px;-webkit-tap-highlight-color:transparent}
 .backlog-btn:hover{background:rgba(245,158,66,0.16)}
@@ -366,6 +369,7 @@ document.addEventListener('DOMContentLoaded',function(){
     <div class="page-spacer"></div>
     <div class="sec-label">Notizen</div>
     <div class="notes-area"><textarea id="notes" placeholder="Wie lief das Training…"></textarea></div>
+    <button class="finish-btn" id="finish-btn" onclick="finishTraining()" style="display:none">✓ Training abschließen</button>
   </div>
 
   <div class="page" id="page-history">
@@ -736,6 +740,8 @@ function updateStats(){
   document.getElementById('stat-ex').textContent=currentSession.exercises.length;
   document.getElementById('stat-sets').textContent=totalSets;
   document.getElementById('stat-vol').textContent=Math.round(totalVol).toLocaleString('de');
+  const fb=document.getElementById('finish-btn');
+  if(fb)fb.style.display=currentSession.exercises.length>0?'block':'none';
 }
 
 function render(){
@@ -861,6 +867,24 @@ window.updateSet = function(ei,si,field,val){
 window.addSet = function(ei){currentSession.exercises[ei].sets.push({kg:'',reps:''});scheduleSave();render();}
 window.removeEx = function(ei){currentSession.exercises.splice(ei,1);scheduleSave();render();}
 
+// ── FINISH TRAINING ──
+window.finishTraining = async function(){
+  if(!currentSession.exercises.length)return;
+  try{
+    // Force immediate save
+    if(saveTimer)clearTimeout(saveTimer);
+    await saveSession();
+    setSyncStatus('synced','✓ Training gespeichert!');
+    setTimeout(()=>setSyncStatus('','Bereit'),3000);
+    // Collapse all exercises
+    currentSession.exercises.forEach(ex=>ex.open=false);
+    render();
+    window.scrollTo({top:0,behavior:'smooth'});
+  }catch(e){
+    setSyncStatus('error','✗ Speichern fehlgeschlagen');
+  }
+};
+
 // ── EXERCISE MODAL ──
 window.openModal = function(){
   document.getElementById('modal-overlay').classList.add('open');
@@ -912,7 +936,14 @@ window.addExercise = function(name){
 // ── HISTORY ──
 function renderHistory(){
   const list=document.getElementById('history-list');
-  const keys=Object.keys(sessions).filter(k=>k!==todayKey).sort((a,b)=>b.localeCompare(a));
+  const keys=Object.keys(sessions).filter(k=>{
+    if(k===todayKey){
+      // Show today in history only if it has exercises (training was done)
+      const s=sessions[k];
+      return s&&s.exercises&&s.exercises.length>0;
+    }
+    return true;
+  }).sort((a,b)=>b.localeCompare(a));
   if(!keys.length){list.innerHTML=`<div class="history-empty">Noch keine vergangenen Trainings.<br><br>Trag heute dein erstes Training ein!</div>`;return;}
   list.innerHTML='';
   keys.forEach(key=>{
