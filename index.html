@@ -46,7 +46,7 @@ html,body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-seri
 }
 .page{display:none}.page.active{display:block;padding-bottom:20px}
 /* BOTTOM NAV */
-.bottom-nav{position:fixed;bottom:0;left:0;right:0;width:100%;background:rgba(14,14,20,0.65);backdrop-filter:blur(30px) saturate(1.8);-webkit-backdrop-filter:blur(30px) saturate(1.8);border-top:1px solid rgba(255,255,255,0.06);display:flex;z-index:50;padding-bottom:env(safe-area-inset-bottom,0px);max-width:100%}
+.bottom-nav{position:fixed;bottom:0;left:0;right:0;width:100%;background:rgba(22,20,35,0.88);backdrop-filter:blur(30px) saturate(1.8);-webkit-backdrop-filter:blur(30px) saturate(1.8);border-top:1px solid rgba(108,92,231,0.2);display:flex;z-index:50;padding-bottom:env(safe-area-inset-bottom,0px);max-width:100%}
 .nav-btn{flex:1;padding:10px 0 8px;display:flex;flex-direction:column;align-items:center;gap:4px;background:none;border:none;color:var(--text-muted);cursor:pointer;font-family:'DM Sans',sans-serif;font-size:11px;font-weight:600;letter-spacing:0.03em;transition:color 0.2s}
 .nav-btn.active{color:var(--accent)}
 .nav-icon{font-size:22px;line-height:1}
@@ -307,7 +307,7 @@ button,.exercise-option,.session-card,.template-card{-webkit-tap-highlight-color
 @keyframes slideUp{from{transform:translateY(100%)}to{transform:translateY(0)}}
 </style>
 <script>
-var APP_VERSION='v2.1.0';
+var APP_VERSION='v2.2.0';
 if('serviceWorker' in navigator){navigator.serviceWorker.getRegistrations().then(regs=>regs.forEach(r=>r.unregister()));}
 (function(){
   var key='appV_'+APP_VERSION;
@@ -316,10 +316,15 @@ if('serviceWorker' in navigator){navigator.serviceWorker.getRegistrations().then
     location.replace(location.pathname+'?v='+APP_VERSION+'&t='+Date.now());
   }
 })();
-document.addEventListener('DOMContentLoaded',function(){
+function setVersionDisplay(){
   var el=document.getElementById('version-display');
   if(el)el.textContent=APP_VERSION;
-});
+}
+if(document.readyState==='loading'){
+  document.addEventListener('DOMContentLoaded',setVersionDisplay);
+}else{
+  setVersionDisplay();
+}
 </script>
 </head>
 <body>
@@ -687,6 +692,9 @@ function initUI() {
     currentSession.notes = e.target.value;
     scheduleSave();
   });
+  // Ensure version is displayed
+  const vd=document.getElementById('version-display');
+  if(vd&&window.APP_VERSION)vd.textContent=window.APP_VERSION;
   render();
 }
 
