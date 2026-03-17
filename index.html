@@ -23,9 +23,9 @@
   --text:#e8e8f0;--text-secondary:#9090a8;--text-muted:#5a5a70;
   --radius:12px;--radius-sm:8px;--radius-xs:6px;
 }
-html,body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;min-height:100vh;min-height:100dvh;-webkit-text-size-adjust:100%;text-size-adjust:100%}
+html,body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;min-height:100vh;min-height:100dvh;-webkit-text-size-adjust:100%;text-size-adjust:100%;overflow-x:hidden}
 .app{max-width:430px;margin:0 auto;min-height:100dvh;padding:calc(env(safe-area-inset-top,0px)+16px) 16px calc(env(safe-area-inset-bottom,0px)+90px) 16px;-webkit-overflow-scrolling:touch}
-.page{display:none}.page.active{display:flex;flex-direction:column;min-height:calc(100dvh - 60px)}
+.page{display:none}.page.active{display:block;padding-bottom:20px}
 /* BOTTOM NAV */
 .bottom-nav{position:fixed;bottom:0;left:0;right:0;width:100%;background:rgba(14,14,20,0.65);backdrop-filter:blur(30px) saturate(1.8);-webkit-backdrop-filter:blur(30px) saturate(1.8);border-top:1px solid rgba(255,255,255,0.06);display:flex;z-index:50;padding-bottom:env(safe-area-inset-bottom,0px);max-width:100%}
 .nav-btn{flex:1;padding:10px 0 8px;display:flex;flex-direction:column;align-items:center;gap:4px;background:none;border:none;color:var(--text-muted);cursor:pointer;font-family:'DM Sans',sans-serif;font-size:10px;font-weight:500;letter-spacing:0.03em;transition:color 0.2s}
@@ -273,7 +273,7 @@ html,body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-seri
 .empty-state-icon{font-size:48px;margin-bottom:16px;opacity:0.25}
 .empty-state-title{font-family:'Space Grotesk',sans-serif;font-size:16px;font-weight:600;color:var(--text-muted);margin-bottom:8px}
 .empty-state-sub{font-size:13px;color:var(--text-muted);line-height:1.5;opacity:0.7}
-.page-spacer{flex:1;min-height:20px}
+.page-spacer{height:20px}
 /* iOS-SPECIFIC */
 @supports (-webkit-touch-callout: none){input[type=number]{font-size:16px !important}}
 input[type=number]::-webkit-inner-spin-button,input[type=number]::-webkit-outer-spin-button{-webkit-appearance:none;margin:0}
@@ -380,7 +380,7 @@ document.addEventListener('DOMContentLoaded',function(){
     <button class="add-exercise-btn" onclick="openBacklogExModal()">+ Übung hinzufügen</button>
     <div class="sec-label">Notizen</div>
     <div class="notes-area"><textarea id="backlog-notes" placeholder="Wie lief das Training…"></textarea></div>
-    <div style="margin-top:16px;display:flex;gap:8px">
+    <div style="margin-top:16px;display:flex;gap:8px;margin-bottom:30px">
       <button onclick="cancelBacklog()" style="flex:1;padding:14px;background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius-sm);font-family:'Space Grotesk',sans-serif;font-size:14px;font-weight:600;color:var(--text-secondary);cursor:pointer">Abbrechen</button>
       <button onclick="saveBacklog()" style="flex:2;padding:14px;background:#f59e42;border:none;border-radius:var(--radius-sm);font-family:'Space Grotesk',sans-serif;font-size:14px;font-weight:700;color:#1a1400;cursor:pointer">Training speichern</button>
     </div>
