@@ -24,10 +24,12 @@
   --radius:12px;--radius-sm:8px;--radius-xs:6px;
 }
 html,body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;min-height:100vh;min-height:100dvh;-webkit-text-size-adjust:100%;text-size-adjust:100%;overflow-x:hidden;font-size:18px}
-.app{max-width:500px;margin:0 auto;min-height:100dvh;padding:calc(env(safe-area-inset-top,0px)+18px) 18px calc(env(safe-area-inset-bottom,0px)+110px) 18px;-webkit-overflow-scrolling:touch}
-/* Standalone PWA mode — push everything WAY down below status bar */
-@media all and (display-mode: standalone){
-  .app{padding-top:calc(env(safe-area-inset-top,59px)+30px)}
+.app{max-width:500px;margin:0 auto;min-height:100dvh;padding:20px 18px calc(env(safe-area-inset-bottom,0px)+110px) 18px;-webkit-overflow-scrolling:touch}
+/* Standalone PWA — detected via JS (window.navigator.standalone on iOS) */
+html.standalone .app{padding-top:calc(env(safe-area-inset-top,47px) + 16px)}
+/* Hard fallback if env() doesn't work */
+@supports not (padding: env(safe-area-inset-top)){
+  html.standalone .app{padding-top:70px}
 }
 /* Larger phones */
 @media screen and (min-width:390px){
@@ -309,7 +311,7 @@ button,.exercise-option,.session-card,.template-card{-webkit-tap-highlight-color
 @keyframes slideUp{from{transform:translateY(100%)}to{transform:translateY(0)}}
 </style>
 <script>
-var APP_VERSION='v2.2.0';
+var APP_VERSION='v2.3.0';
 if('serviceWorker' in navigator){navigator.serviceWorker.getRegistrations().then(regs=>regs.forEach(r=>r.unregister()));}
 (function(){
   var key='appV_'+APP_VERSION;
@@ -318,6 +320,10 @@ if('serviceWorker' in navigator){navigator.serviceWorker.getRegistrations().then
     location.replace(location.pathname+'?v='+APP_VERSION+'&t='+Date.now());
   }
 })();
+// Detect standalone mode reliably on iOS
+if(window.navigator.standalone===true||window.matchMedia('(display-mode:standalone)').matches){
+  document.documentElement.classList.add('standalone');
+}
 function setVersionDisplay(){
   var el=document.getElementById('version-display');
   if(el)el.textContent=APP_VERSION;
