@@ -46,7 +46,7 @@ html,body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-seri
 }
 .page{display:none}.page.active{display:block;padding-bottom:20px}
 /* BOTTOM NAV */
-.bottom-nav{position:fixed;bottom:0;left:0;right:0;width:100%;background:rgba(22,20,35,0.88);backdrop-filter:blur(30px) saturate(1.8);-webkit-backdrop-filter:blur(30px) saturate(1.8);border-top:1px solid rgba(108,92,231,0.2);display:flex;z-index:50;padding-bottom:env(safe-area-inset-bottom,0px);max-width:100%}
+.bottom-nav{position:fixed;bottom:0;left:0;right:0;width:100%;background:rgba(30,26,52,0.95);backdrop-filter:blur(30px) saturate(1.8);-webkit-backdrop-filter:blur(30px) saturate(1.8);border-top:2px solid rgba(108,92,231,0.35);box-shadow:0 -4px 20px rgba(0,0,0,0.4);display:flex;z-index:50;padding-bottom:env(safe-area-inset-bottom,0px);max-width:100%}
 .nav-btn{flex:1;padding:10px 0 8px;display:flex;flex-direction:column;align-items:center;gap:4px;background:none;border:none;color:var(--text-muted);cursor:pointer;font-family:'DM Sans',sans-serif;font-size:11px;font-weight:600;letter-spacing:0.03em;transition:color 0.2s}
 .nav-btn.active{color:var(--accent)}
 .nav-icon{font-size:22px;line-height:1}
@@ -392,6 +392,11 @@ if(document.readyState==='loading'){
     <div class="sec-label">Übungen</div>
     <div id="detail-exercises"></div>
     <div id="detail-notes-wrap"></div>
+    <div style="margin-top:20px;display:flex;gap:8px">
+      <button onclick="editSession()" style="flex:2;padding:14px;background:var(--accent);border:none;border-radius:var(--radius-sm);font-family:'Space Grotesk',sans-serif;font-size:14px;font-weight:700;color:#fff;cursor:pointer;transition:all 0.15s">✎ Bearbeiten</button>
+      <button onclick="deleteSession()" style="flex:1;padding:14px;background:rgba(255,107,107,0.1);border:1px solid rgba(255,107,107,0.3);border-radius:var(--radius-sm);font-family:'Space Grotesk',sans-serif;font-size:14px;font-weight:600;color:var(--red);cursor:pointer;transition:all 0.15s">Löschen</button>
+    </div>
+    <div style="height:20px"></div>
   </div>
 
   <div class="page" id="page-goals">
@@ -531,7 +536,7 @@ if(document.readyState==='loading'){
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
 import { getAuth, GoogleAuthProvider, signInWithPopup, onAuthStateChanged, signOut as fbSignOut } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
-import { getFirestore, doc, getDoc, setDoc, collection, getDocs } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+import { getFirestore, doc, getDoc, setDoc, deleteDoc, collection, getDocs } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 
 const firebaseConfig = {
   apiKey: "AIzaSyDb7vt_KFwn0Bw0szJ6wfFWoW_rvCdHjkA",
@@ -990,7 +995,10 @@ function renderHistory(){
   });
 }
 
+let currentDetailKey=null;
+
 function showDetail(key){
+  currentDetailKey=key;
   const s=sessions[key];if(!s)return;
   const d=new Date(key+'T12:00:00');
   const dayIdx=(d.getDay()+6)%7;
@@ -1021,6 +1029,46 @@ function showDetail(key){
   document.getElementById('detail-notes-wrap').innerHTML=s.notes&&s.notes.trim()?`<div class="sec-label">Notizen</div><div class="detail-notes">${s.notes}</div>`:'';
   window.showPage('detail');
 }
+
+window.editSession = function(){
+  if(!currentDetailKey||!sessions[currentDetailKey])return;
+  backlogKey=currentDetailKey;
+  backlogSession=JSON.parse(JSON.stringify(sessions[currentDetailKey]));
+  // Ensure all exercises are open for editing
+  backlogSession.exercises.forEach(ex=>ex.open=true);
+  const d=new Date(currentDetailKey+'T12:00:00');
+  const dayIdx=(d.getDay()+6)%7;
+  document.getElementById('backlog-date-label').textContent=DAYS_FULL[dayIdx]+', '+d.getDate()+'. '+monthsFull[d.getMonth()]+' '+d.getFullYear();
+  document.getElementById('backlog-notes').value=backlogSession.notes||'';
+  renderBacklogExercises();
+  window.showPage('backlog');
+};
+
+window.deleteSession = async function(){
+  if(!currentDetailKey)return;
+  const d=new Date(currentDetailKey+'T12:00:00');
+  const dayIdx=(d.getDay()+6)%7;
+  const label=DAYS_FULL[dayIdx]+', '+d.getDate()+'. '+monthsFull[d.getMonth()]+' '+d.getFullYear();
+  if(!confirm('Training vom '+label+' wirklich löschen?'))return;
+  setSyncStatus('syncing','↑ Wird gelöscht…');
+  try{
+    await deleteDoc(doc(db,'users',currentUser.uid,'sessions',currentDetailKey));
+    delete sessions[currentDetailKey];
+    // If deleting today's session, reset currentSession too
+    if(currentDetailKey===todayKey){
+      currentSession={exercises:[],notes:''};
+      document.getElementById('notes').value='';
+      render();
+    }
+    setSyncStatus('synced','✓ Gelöscht');
+    setTimeout(()=>setSyncStatus('','Bereit'),2000);
+    currentDetailKey=null;
+    window.showPage('history');
+  }catch(e){
+    setSyncStatus('error','✗ Löschen fehlgeschlagen');
+    console.error(e);
+  }
+};
 
 // ── GOALS ──
 function getMondayOfWeek(date){
