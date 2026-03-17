@@ -24,9 +24,9 @@
   --radius:12px;--radius-sm:8px;--radius-xs:6px;
 }
 html,body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;min-height:100vh;min-height:100dvh;-webkit-text-size-adjust:100%;text-size-adjust:100%;overflow-x:hidden;font-size:18px}
-.app{max-width:500px;margin:0 auto;min-height:100dvh;padding:20px 18px calc(env(safe-area-inset-bottom,0px)+110px) 18px;-webkit-overflow-scrolling:touch}
+.app{max-width:500px;margin:0 auto;min-height:100dvh;padding:20px 18px calc(env(safe-area-inset-bottom,0px)+160px) 18px;-webkit-overflow-scrolling:touch}
 /* Standalone PWA — detected via JS (window.navigator.standalone on iOS) */
-html.standalone .app{padding-top:calc(env(safe-area-inset-top,47px) + 16px)}
+html.standalone .app{padding-top:calc(env(safe-area-inset-top,47px) + 16px);padding-bottom:calc(env(safe-area-inset-bottom,34px)+160px)}
 /* Hard fallback if env() doesn't work */
 @supports not (padding: env(safe-area-inset-top)){
   html.standalone .app{padding-top:70px}
