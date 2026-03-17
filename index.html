@@ -386,16 +386,20 @@ if(document.readyState==='loading'){
 
   <div class="page" id="page-detail">
     <button class="detail-back" onclick="showPage('history')">← Zurück</button>
-    <div class="detail-title" id="detail-title"></div>
-    <div class="detail-sub" id="detail-sub"></div>
+    <div style="display:flex;align-items:flex-start;gap:10px;margin-bottom:4px">
+      <div style="flex:1">
+        <div class="detail-title" id="detail-title"></div>
+        <div class="detail-sub" id="detail-sub"></div>
+      </div>
+      <div style="display:flex;gap:6px;flex-shrink:0;padding-top:2px">
+        <button onclick="editSession()" style="padding:8px 14px;background:var(--accent);border:none;border-radius:var(--radius-xs);font-family:'DM Sans',sans-serif;font-size:12px;font-weight:600;color:#fff;cursor:pointer;white-space:nowrap">✎ Edit</button>
+        <button onclick="deleteSession()" style="padding:8px 10px;background:rgba(255,107,107,0.1);border:1px solid rgba(255,107,107,0.25);border-radius:var(--radius-xs);font-family:'DM Sans',sans-serif;font-size:12px;font-weight:600;color:var(--red);cursor:pointer">✕</button>
+      </div>
+    </div>
     <div class="stats-row" id="detail-stats"></div>
     <div class="sec-label">Übungen</div>
     <div id="detail-exercises"></div>
     <div id="detail-notes-wrap"></div>
-    <div style="margin-top:20px;display:flex;gap:8px">
-      <button onclick="editSession()" style="flex:2;padding:14px;background:var(--accent);border:none;border-radius:var(--radius-sm);font-family:'Space Grotesk',sans-serif;font-size:14px;font-weight:700;color:#fff;cursor:pointer;transition:all 0.15s">✎ Bearbeiten</button>
-      <button onclick="deleteSession()" style="flex:1;padding:14px;background:rgba(255,107,107,0.1);border:1px solid rgba(255,107,107,0.3);border-radius:var(--radius-sm);font-family:'Space Grotesk',sans-serif;font-size:14px;font-weight:600;color:var(--red);cursor:pointer;transition:all 0.15s">Löschen</button>
-    </div>
     <div style="height:20px"></div>
   </div>
 
@@ -412,7 +416,13 @@ if(document.readyState==='loading'){
     <button class="detail-back" onclick="cancelBacklog()">← Abbrechen</button>
     <div style="background:rgba(245,158,66,0.1);border:1px solid rgba(245,158,66,0.25);border-radius:var(--radius);padding:14px 16px;margin-bottom:16px">
       <div style="font-family:'Space Grotesk',sans-serif;font-size:16px;font-weight:700;color:#f59e42">📅 Vergangenes Training erfassen</div>
-      <div style="font-size:13px;color:var(--text-secondary);margin-top:4px" id="backlog-date-label"></div>
+      <div style="display:flex;align-items:center;gap:8px;margin-top:4px">
+        <div style="font-size:13px;color:var(--text-secondary);flex:1" id="backlog-date-label"></div>
+        <label style="position:relative;cursor:pointer;flex-shrink:0">
+          <span style="font-size:11px;color:#f59e42;background:rgba(245,158,66,0.15);border:1px solid rgba(245,158,66,0.3);border-radius:var(--radius-xs);padding:5px 10px;font-family:'DM Sans',sans-serif;font-weight:600;display:inline-block">Datum ändern</span>
+          <input type="date" id="backlog-change-date" onchange="changeBacklogDate(this.value)" style="position:absolute;top:0;left:0;width:100%;height:100%;opacity:0;cursor:pointer;-webkit-appearance:none">
+        </label>
+      </div>
     </div>
     <div class="sec-label">Übungen</div>
     <div id="backlog-exercise-list"></div>
@@ -1033,13 +1043,14 @@ function showDetail(key){
 window.editSession = function(){
   if(!currentDetailKey||!sessions[currentDetailKey])return;
   backlogKey=currentDetailKey;
+  backlogOriginalKey=currentDetailKey; // remember original date for potential date change
   backlogSession=JSON.parse(JSON.stringify(sessions[currentDetailKey]));
-  // Ensure all exercises are open for editing
   backlogSession.exercises.forEach(ex=>ex.open=true);
   const d=new Date(currentDetailKey+'T12:00:00');
   const dayIdx=(d.getDay()+6)%7;
   document.getElementById('backlog-date-label').textContent=DAYS_FULL[dayIdx]+', '+d.getDate()+'. '+monthsFull[d.getMonth()]+' '+d.getFullYear();
   document.getElementById('backlog-notes').value=backlogSession.notes||'';
+  document.getElementById('backlog-change-date').max=todayKey;
   renderBacklogExercises();
   window.showPage('backlog');
 };
@@ -1260,6 +1271,7 @@ window.doImport = function(mode){
 
 // ── BACKLOG / VERGANGENES TRAINING ERFASSEN ──
 let backlogKey = null;
+let backlogOriginalKey = null; // tracks original date when editing, to delete old entry if date changes
 let backlogSession = {exercises:[], notes:''};
 
 window.openBacklogDateModal = function(){
@@ -1277,6 +1289,7 @@ window.confirmBacklogDate = function(){
   if(dateStr>todayKey){alert('Datum darf nicht in der Zukunft liegen.');return;}
   window.closeBacklogDateModal();
   backlogKey = dateStr;
+  backlogOriginalKey = null; // new entry, no original to delete
   backlogSession = sessions[dateStr] ? JSON.parse(JSON.stringify(sessions[dateStr])) : {exercises:[], notes:''};
   const d=new Date(dateStr+'T12:00:00');
   const dayIdx=(d.getDay()+6)%7;
@@ -1288,8 +1301,19 @@ window.confirmBacklogDate = function(){
 
 window.cancelBacklog = function(){
   backlogKey=null;
+  backlogOriginalKey=null;
   backlogSession={exercises:[],notes:''};
   window.showPage('today');
+};
+
+window.changeBacklogDate = function(dateStr){
+  if(!dateStr)return;
+  if(dateStr>todayKey){alert('Datum darf nicht in der Zukunft liegen.');return;}
+  backlogKey=dateStr;
+  const d=new Date(dateStr+'T12:00:00');
+  const dayIdx=(d.getDay()+6)%7;
+  document.getElementById('backlog-date-label').textContent=DAYS_FULL[dayIdx]+', '+d.getDate()+'. '+monthsFull[d.getMonth()]+' '+d.getFullYear();
+  document.getElementById('backlog-change-date').value='';
 };
 
 window.saveBacklog = async function(){
@@ -1298,12 +1322,27 @@ window.saveBacklog = async function(){
   backlogSession.notes=document.getElementById('backlog-notes').value||'';
   setSyncStatus('syncing','↑ Wird gespeichert…');
   try{
+    // If date was changed during edit, delete the old entry
+    if(backlogOriginalKey&&backlogOriginalKey!==backlogKey){
+      await deleteDoc(doc(db,'users',currentUser.uid,'sessions',backlogOriginalKey));
+      delete sessions[backlogOriginalKey];
+      if(backlogOriginalKey===todayKey){
+        currentSession={exercises:[],notes:''};
+        document.getElementById('notes').value='';
+      }
+    }
     await setDoc(doc(db,'users',currentUser.uid,'sessions',backlogKey),backlogSession);
     sessions[backlogKey]=JSON.parse(JSON.stringify(backlogSession));
+    // If saving to today, update currentSession too
+    if(backlogKey===todayKey){
+      currentSession=JSON.parse(JSON.stringify(backlogSession));
+      document.getElementById('notes').value=currentSession.notes||'';
+    }
     setSyncStatus('synced','✓ Gespeichert');
     setTimeout(()=>setSyncStatus('','Bereit'),1500);
-    backlogKey=null;backlogSession={exercises:[],notes:''};
-    window.showPage('today');
+    backlogKey=null;backlogOriginalKey=null;backlogSession={exercises:[],notes:''};
+    render();
+    window.showPage('history');
   }catch(e){setSyncStatus('error','✗ Speichern fehlgeschlagen');console.error(e);}
 };
 
