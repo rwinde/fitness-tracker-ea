@@ -98,8 +98,9 @@ html,body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-seri
 .stat-num{font-family:'Space Grotesk',sans-serif;font-size:24px;font-weight:700;color:#fff}
 .stat-lbl{font-size:12px;color:var(--text-secondary);margin-top:4px;font-weight:500}
 /* FINISH TRAINING */
-.finish-btn{width:100%;padding:16px;margin-top:16px;background:var(--green);border:none;border-radius:var(--radius);font-family:'Space Grotesk',sans-serif;font-size:15px;font-weight:700;color:#0a2018;cursor:pointer;transition:all 0.15s;-webkit-tap-highlight-color:transparent}
-.finish-btn:active{transform:scale(0.98);opacity:0.85}
+.finish-btn{width:100%;padding:16px;margin-bottom:14px;background:var(--green);border:none;border-radius:var(--radius);font-family:'Space Grotesk',sans-serif;font-size:15px;font-weight:700;color:#0a2018;cursor:pointer;transition:all 0.2s;-webkit-tap-highlight-color:transparent}
+.finish-btn:active:not(.disabled){transform:scale(0.98);opacity:0.85}
+.finish-btn.disabled{background:var(--surface2);color:var(--text-muted);cursor:default;opacity:0.5}
 /* BACKLOG BUTTON */
 .backlog-btn{width:100%;padding:14px 16px;margin-bottom:12px;background:rgba(245,158,66,0.1);border:1px solid rgba(245,158,66,0.3);border-radius:var(--radius);font-family:'Space Grotesk',sans-serif;font-size:14px;font-weight:600;color:#f59e42;cursor:pointer;transition:all 0.15s;display:flex;align-items:center;justify-content:center;gap:6px;-webkit-tap-highlight-color:transparent}
 .backlog-btn:hover{background:rgba(245,158,66,0.16)}
@@ -363,13 +364,13 @@ document.addEventListener('DOMContentLoaded',function(){
       <div class="stat-card"><div class="stat-num" id="stat-sets">0</div><div class="stat-lbl">Sätze</div></div>
       <div class="stat-card"><div class="stat-num" id="stat-vol">0</div><div class="stat-lbl">kg Total</div></div>
     </div>
+    <button class="finish-btn disabled" id="finish-btn" onclick="finishTraining()" disabled>✓ Training abschließen</button>
     <div class="sec-label">Übungen</div>
     <div id="exercise-list"></div>
     <button class="add-exercise-btn" onclick="openModal()">+ Übung hinzufügen</button>
     <div class="page-spacer"></div>
     <div class="sec-label">Notizen</div>
     <div class="notes-area"><textarea id="notes" placeholder="Wie lief das Training…"></textarea></div>
-    <button class="finish-btn" id="finish-btn" onclick="finishTraining()" style="display:none">✓ Training abschließen</button>
     <div style="height:30px"></div>
   </div>
 
@@ -742,7 +743,11 @@ function updateStats(){
   document.getElementById('stat-sets').textContent=totalSets;
   document.getElementById('stat-vol').textContent=Math.round(totalVol).toLocaleString('de');
   const fb=document.getElementById('finish-btn');
-  if(fb)fb.style.display=currentSession.exercises.length>0?'block':'none';
+  if(fb){
+    const hasExercises=currentSession.exercises.length>0;
+    fb.disabled=!hasExercises;
+    fb.classList.toggle('disabled',!hasExercises);
+  }
 }
 
 function render(){
