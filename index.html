@@ -24,9 +24,9 @@
   --radius:12px;--radius-sm:8px;--radius-xs:6px;
 }
 html,body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;min-height:100vh;min-height:100dvh;-webkit-text-size-adjust:100%;text-size-adjust:100%;overflow-x:hidden;font-size:18px}
-.app{max-width:500px;margin:0 auto;min-height:100dvh;padding:20px 18px calc(env(safe-area-inset-bottom,0px)+160px) 18px;-webkit-overflow-scrolling:touch}
+.app{max-width:500px;margin:0 auto;min-height:100dvh;padding:20px 18px 200px 18px;-webkit-overflow-scrolling:touch}
 /* Standalone PWA — detected via JS (window.navigator.standalone on iOS) */
-html.standalone .app{padding-top:calc(env(safe-area-inset-top,47px) + 16px);padding-bottom:calc(env(safe-area-inset-bottom,34px)+160px)}
+html.standalone .app{padding-top:calc(env(safe-area-inset-top,47px) + 16px);padding-bottom:calc(env(safe-area-inset-bottom,34px)+200px)}
 /* Hard fallback if env() doesn't work */
 @supports not (padding: env(safe-area-inset-top)){
   html.standalone .app{padding-top:70px}
@@ -48,7 +48,7 @@ html.standalone .app{padding-top:calc(env(safe-area-inset-top,47px) + 16px);padd
   .exercise-name{font-size:20px}
   .set-input{width:76px;height:48px;font-size:20px}
 }
-.page{display:none}.page.active{display:block;padding-bottom:20px}
+.page{display:none}.page.active{display:block;padding-bottom:60px}
 /* BOTTOM NAV */
 .bottom-nav{position:fixed;bottom:0;left:0;right:0;width:100%;background:rgba(30,26,52,0.95);backdrop-filter:blur(30px) saturate(1.8);-webkit-backdrop-filter:blur(30px) saturate(1.8);border-top:2px solid rgba(108,92,231,0.35);box-shadow:0 -4px 20px rgba(0,0,0,0.4);display:flex;z-index:50;padding-bottom:env(safe-area-inset-bottom,0px);max-width:100%}
 .nav-btn{flex:1;padding:10px 0 8px;display:flex;flex-direction:column;align-items:center;gap:4px;background:none;border:none;color:var(--text-muted);cursor:pointer;font-family:'DM Sans',sans-serif;font-size:14px;font-weight:600;letter-spacing:0.03em;transition:color 0.2s}
@@ -300,7 +300,7 @@ html.standalone .app{padding-top:calc(env(safe-area-inset-top,47px) + 16px);padd
 .empty-state-icon{font-size:48px;margin-bottom:16px;opacity:0.25}
 .empty-state-title{font-family:'Space Grotesk',sans-serif;font-size:16px;font-weight:600;color:var(--text-muted);margin-bottom:8px}
 .empty-state-sub{font-size:15px;color:var(--text-muted);line-height:1.5;opacity:0.7}
-.page-spacer{height:20px}
+.page-spacer{height:30px}
 /* iOS-SPECIFIC */
 @supports (-webkit-touch-callout: none){input[type=number]{font-size:16px !important}}
 input[type=number]::-webkit-inner-spin-button,input[type=number]::-webkit-outer-spin-button{-webkit-appearance:none;margin:0}
@@ -384,7 +384,7 @@ if(document.readyState==='loading'){
     <div class="page-spacer"></div>
     <div class="sec-label">Notizen</div>
     <div class="notes-area"><textarea id="notes" placeholder="Wie lief das Training…"></textarea></div>
-    <div style="height:30px"></div>
+    <div style="height:80px"></div>
   </div>
 
   <div class="page" id="page-history">
@@ -408,7 +408,7 @@ if(document.readyState==='loading'){
     <div class="sec-label">Übungen</div>
     <div id="detail-exercises"></div>
     <div id="detail-notes-wrap"></div>
-    <div style="height:20px"></div>
+    <div style="height:80px"></div>
   </div>
 
   <div class="page" id="page-goals">
@@ -437,7 +437,7 @@ if(document.readyState==='loading'){
     <button class="add-exercise-btn" onclick="openBacklogExModal()">+ Übung hinzufügen</button>
     <div class="sec-label">Notizen</div>
     <div class="notes-area"><textarea id="backlog-notes" placeholder="Wie lief das Training…"></textarea></div>
-    <div style="margin-top:16px;display:flex;gap:8px;margin-bottom:30px">
+    <div style="margin-top:16px;display:flex;gap:8px;margin-bottom:80px">
       <button onclick="cancelBacklog()" style="flex:1;padding:14px;background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius-sm);font-family:'Space Grotesk',sans-serif;font-size:14px;font-weight:600;color:var(--text-secondary);cursor:pointer">Abbrechen</button>
       <button onclick="saveBacklog()" style="flex:2;padding:14px;background:#f59e42;border:none;border-radius:var(--radius-sm);font-family:'Space Grotesk',sans-serif;font-size:14px;font-weight:700;color:#1a1400;cursor:pointer">Training speichern</button>
     </div>
