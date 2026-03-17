@@ -24,7 +24,7 @@
   --radius:12px;--radius-sm:8px;--radius-xs:6px;
 }
 html,body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;min-height:100vh;min-height:100dvh;-webkit-text-size-adjust:100%;text-size-adjust:100%;overflow-x:hidden;font-size:16px}
-.app{max-width:500px;margin:0 auto;min-height:100dvh;padding:calc(env(safe-area-inset-top,0px)+16px) 16px calc(env(safe-area-inset-bottom,0px)+94px) 16px;-webkit-overflow-scrolling:touch}
+.app{max-width:500px;margin:0 auto;min-height:100dvh;padding:calc(env(safe-area-inset-top,0px)+16px) 16px calc(env(safe-area-inset-bottom,0px)+110px) 16px;-webkit-overflow-scrolling:touch}
 /* Standalone PWA mode — proper safe area respect */
 @media all and (display-mode: standalone){
   .app{padding-top:calc(env(safe-area-inset-top,44px)+10px)}
@@ -370,6 +370,7 @@ document.addEventListener('DOMContentLoaded',function(){
     <div class="sec-label">Notizen</div>
     <div class="notes-area"><textarea id="notes" placeholder="Wie lief das Training…"></textarea></div>
     <button class="finish-btn" id="finish-btn" onclick="finishTraining()" style="display:none">✓ Training abschließen</button>
+    <div style="height:30px"></div>
   </div>
 
   <div class="page" id="page-history">
