@@ -11,9 +11,9 @@
 <link rel="apple-touch-icon" sizes="180x180" href="icon.png">
 <meta name="apple-mobile-web-app-title" content="Fitness">
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="styles.css">
+<link rel="stylesheet" href="styles.css?v=v2.5.10">
 <script>
-var APP_VERSION='v2.5.9';
+var APP_VERSION='v2.5.10';
 if('serviceWorker' in navigator){navigator.serviceWorker.getRegistrations().then(regs=>regs.forEach(r=>r.unregister()));}
 // Safari Private Mode and some embedded webviews throw on sessionStorage access.
 // Skipping the one-time cache-buster reload there is acceptable — worst case the user sees stale assets.
@@ -276,6 +276,6 @@ if(document.readyState==='loading'){
   </div>
 </div>
 
-<script type="module" src="app.js?v=v2.5.9"></script>
+<script type="module" src="app.js?v=v2.5.10"></script>
 </body>
 </html>
