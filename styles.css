@@ -162,6 +162,7 @@ html.standalone .app{padding-top:calc(env(safe-area-inset-top,47px) + 60px);padd
 .exercise-card.has-pr{border-color:rgba(240,192,64,0.3);box-shadow:0 0 24px var(--gold-dim)}
 .exercise-card.dragging{opacity:0.5;transform:scale(0.98)}
 .exercise-card.drag-over{border-color:var(--accent);box-shadow:0 0 20px var(--accent-glow)}
+.drag-clone{position:fixed;left:0;top:0;z-index:200;opacity:0.85;pointer-events:none;transform:translate(var(--x,0),var(--y,0)) scale(0.95)}
 .exercise-header{display:flex;align-items:center;padding:14px var(--space-16);gap:10px;cursor:pointer;user-select:none;-webkit-user-select:none}
 .drag-handle{cursor:grab;color:var(--text-muted);font-size:var(--text-size-md);padding:var(--space-4);touch-action:none;line-height:1}
 .drag-handle:active{cursor:grabbing}
@@ -254,9 +255,12 @@ html.standalone .app{padding-top:calc(env(safe-area-inset-top,47px) + 60px);padd
 .week-goal-count.zero{color:var(--text-muted)}
 .progress-bar-wrap{padding:0 var(--space-16) var(--space-16)}
 .progress-bar-bg{height:8px;background:var(--surface3);border-radius:4px;overflow:hidden}
-.progress-bar-fill{height:100%;background:var(--accent);border-radius:4px;transition:width 0.4s ease}
+.progress-bar-fill{height:100%;width:var(--progress,0%);background:var(--accent);border-radius:4px;transition:width 0.4s ease}
 .progress-bar-fill.done{background:var(--gold)}
 .progress-bar-label{display:flex;justify-content:space-between;font-size:var(--text-size-sm);color:var(--text-muted);margin-top:6px;font-weight:500}
+.goal-card-inner{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:var(--space-16)}
+.goal-card-inner-label{font-family:'Space Grotesk',sans-serif;font-size:var(--text-size-xs);color:var(--text-muted);text-transform:uppercase;letter-spacing:0.08em;font-weight:600;margin-bottom:10px}
+.goal-card-inner-dots{display:flex;gap:5px}
 .goal-set-row{padding:var(--space-12) var(--space-16);display:flex;align-items:center;gap:10px;border-top:1px solid var(--border)}
 .goal-set-label{font-size:15px;color:var(--text-secondary);flex:1}
 .goal-stepper{display:flex;align-items:center;gap:10px}
@@ -375,5 +379,6 @@ input[type=number]::-webkit-inner-spin-button,input[type=number]::-webkit-outer-
 input[type=number]{-moz-appearance:textfield}
 button,.exercise-option,.session-card,.template-card{-webkit-tap-highlight-color:transparent}
 @keyframes prFlash{0%{box-shadow:0 0 30px var(--gold-dim)}100%{box-shadow:none}}
+.pr-flash{animation:prFlash 2s ease}
 @keyframes slideDown{from{transform:translateY(-30px);opacity:0}to{transform:translateY(0);opacity:1}}
 @keyframes slideUp{from{transform:translateY(100%)}to{transform:translateY(0)}}

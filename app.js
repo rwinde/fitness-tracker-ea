@@ -311,6 +311,81 @@ function updateStats(){
   }
 }
 
+// Shared empty-state HTML — emoji + title + optional subtitle.
+function renderEmpty(emoji,title,sub){
+  return `<div class="empty-state">
+    <div class="empty-state-icon">${emoji}</div>
+    <div class="empty-state-title">${title}</div>
+    ${sub?`<div class="empty-state-sub">${sub}</div>`:''}
+  </div>`;
+}
+
+// Shared exercise-card renderer used by today / backlog / detail views.
+// opts: { idx, draggable, readonly, showDelete, namespace, badgeHtml, hasPRClass, flashAnimation, isPRSet }
+function renderExerciseCard(ex,opts){
+  const {
+    idx=0,
+    draggable=false,
+    readonly=false,
+    showDelete=false,
+    namespace='today',
+    badgeHtml='',
+    hasPRClass=false,
+    flashAnimation=false,
+    isPRSet=()=>false,
+  }=opts||{};
+  const vol=ex.sets.reduce((sum,set)=>sum+(parseFloat(set.kg)||0)*(parseFloat(set.reps)||0),0);
+  const card=document.createElement('div');
+  if(readonly){
+    const rows=ex.sets.map((set,i)=>{
+      const setKg=parseFloat(set.kg)||0,setReps=parseFloat(set.reps)||0;
+      const sv=setKg*setReps;
+      const isPR=isPRSet(i,setKg,setReps);
+      return `<tr${isPR?' class="pr-row"':''}><td style="color:var(--text-muted);font-family:'Space Grotesk',sans-serif;font-weight:600">${i+1}</td><td>${set.kg||'—'} kg</td><td>${set.reps||'—'}</td><td>${sv>0?Math.round(sv):'—'}</td></tr>`;
+    }).join('');
+    card.className='detail-ex-card'+(hasPRClass?' has-pr':'');
+    const nameHtml=badgeHtml?`${escapeHtml(ex.name)} ${badgeHtml}`:escapeHtml(ex.name);
+    card.innerHTML=`<div class="detail-ex-name">${nameHtml}</div>
+      <table class="detail-sets-table"><thead><tr><th>#</th><th>KG</th><th>Wdh</th><th>Vol</th></tr></thead><tbody>${rows}</tbody></table>
+      <div class="detail-ex-vol">Volumen: <span>${Math.round(vol).toLocaleString('de')} kg</span></div>`;
+    return card;
+  }
+  const updateFn=namespace==='backlog'?'updateBacklogSet':'updateSet';
+  const toggleFn=namespace==='backlog'?'toggleBacklogEx':'toggleEx';
+  const addSetFn=namespace==='backlog'?'addBacklogSet':'addSet';
+  const removeFn=namespace==='backlog'?'removeBacklogEx':'removeEx';
+  const setsRows=ex.sets.map((s,si)=>{
+    const sKg=parseFloat(s.kg)||0,sR=parseFloat(s.reps)||0;
+    const sv=sKg*sR;
+    const isPR=isPRSet(si,sKg,sR);
+    return `<tr>
+      <td>${si+1}</td>
+      <td><input class="set-input${isPR?' pr-value':''}" type="number" min="0" max="${KG_MAX}" step="0.5" inputmode="decimal" value="${s.kg||''}" placeholder="kg" oninput="${updateFn}(${idx},${si},'kg',this)"></td>
+      <td><input class="set-input" type="number" min="0" max="${REPS_MAX}" step="1" inputmode="numeric" value="${s.reps||''}" placeholder="Wdh" oninput="${updateFn}(${idx},${si},'reps',this)"></td>
+      <td class="set-vol">${sv>0?Math.round(sv):'—'}</td>
+    </tr>`;
+  }).join('');
+  card.className='exercise-card'+(hasPRClass?' has-pr':'');
+  if(draggable){card.draggable=true;card.dataset.idx=idx;}
+  if(flashAnimation)card.classList.add('pr-flash');
+  const dragHandle=draggable?`<span class="drag-handle" onmousedown="event.stopPropagation()" ontouchstart="event.stopPropagation()">⠿</span>`:'';
+  card.innerHTML=`
+    <div class="exercise-header" onclick="${toggleFn}(${idx})">
+      ${dragHandle}
+      <div class="exercise-name">${escapeHtml(ex.name)}</div>${badgeHtml}
+      <span class="exercise-toggle${ex.open?' open':''}">▾</span>
+    </div>
+    ${ex.open?`<div class="exercise-body">
+      <table class="sets-table"><thead><tr><th>#</th><th>KG</th><th>Wdh</th><th>Vol</th></tr></thead><tbody>${setsRows}</tbody></table>
+      <button class="add-set-btn" onclick="${addSetFn}(${idx})">+ Satz hinzufügen</button>
+      <div class="exercise-footer">
+        <div><span class="vol-lbl">Volumen</span><span class="vol-val">${Math.round(vol).toLocaleString('de')} kg</span></div>
+      ${showDelete?`<button class="remove-ex" onclick="${removeFn}(${idx})">Entfernen</button>`:''}
+      </div>
+    </div>`:''}`;
+  return card;
+}
+
 function render(){
   const list=document.getElementById('exercise-list');
   list.innerHTML='';
@@ -318,41 +393,20 @@ function render(){
     const pr=getExPR(ex.name);
     const todayBest=getTodayBest(ei);
     const isNewPR=todayBest&&(!pr||todayBest.kg>pr.kg||(todayBest.kg===pr.kg&&todayBest.reps>pr.reps));
-    const vol=calcExVol(ex);
     let badgeHtml;
     if(isNewPR)badgeHtml=`<span class="pr-badge new-pr">🏆 Neuer PR!</span>`;
     else if(pr)badgeHtml=`<span class="pr-badge has">PR: ${pr.kg}kg × ${pr.reps}</span>`;
     else badgeHtml=`<span class="pr-badge none">Kein PR</span>`;
-    const setsRows=ex.sets.map((s,si)=>{
-      const sKg=parseFloat(s.kg)||0,sR=parseFloat(s.reps)||0;
-      const sv=sKg*sR;
-      const isPRSet=sKg>0&&(!pr||sKg>pr.kg||(sKg===pr.kg&&sR>=pr.reps));
-      return `<tr>
-        <td>${si+1}</td>
-        <td><input class="set-input${isPRSet?' pr-value':''}" type="number" min="0" max="${KG_MAX}" step="0.5" inputmode="decimal" value="${s.kg||''}" placeholder="kg" oninput="updateSet(${ei},${si},'kg',this)"></td>
-        <td><input class="set-input" type="number" min="0" max="${REPS_MAX}" step="1" inputmode="numeric" value="${s.reps||''}" placeholder="Wdh" oninput="updateSet(${ei},${si},'reps',this)"></td>
-        <td class="set-vol">${sv>0?Math.round(sv):'—'}</td>
-      </tr>`;
-    }).join('');
-    const card=document.createElement('div');
-    card.className='exercise-card'+(isNewPR?' has-pr':'');
-    card.draggable=true;
-    card.dataset.idx=ei;
-    if(isNewPR)card.style.animation='prFlash 2s ease';
-    card.innerHTML=`
-      <div class="exercise-header" onclick="toggleEx(${ei})">
-        <span class="drag-handle" onmousedown="event.stopPropagation()" ontouchstart="event.stopPropagation()">⠿</span>
-        <div class="exercise-name">${escapeHtml(ex.name)}</div>${badgeHtml}
-        <span class="exercise-toggle${ex.open?' open':''}">▾</span>
-      </div>
-      ${ex.open?`<div class="exercise-body">
-        <table class="sets-table"><thead><tr><th>#</th><th>KG</th><th>Wdh</th><th>Vol</th></tr></thead><tbody>${setsRows}</tbody></table>
-        <button class="add-set-btn" onclick="addSet(${ei})">+ Satz hinzufügen</button>
-        <div class="exercise-footer">
-          <div><span class="vol-lbl">Volumen</span><span class="vol-val">${Math.round(vol).toLocaleString('de')} kg</span></div>
-          <button class="remove-ex" onclick="removeEx(${ei})">Entfernen</button>
-        </div>
-      </div>`:''}`;
+    const card=renderExerciseCard(ex,{
+      idx:ei,
+      draggable:true,
+      showDelete:true,
+      namespace:'today',
+      badgeHtml,
+      hasPRClass:isNewPR,
+      flashAnimation:isNewPR,
+      isPRSet:(si,sKg,sR)=>sKg>0&&(!pr||sKg>pr.kg||(sKg===pr.kg&&sR>=pr.reps)),
+    });
     // Drag & Drop
     card.addEventListener('dragstart',e=>{dragSrcIdx=ei;card.classList.add('dragging');e.dataTransfer.effectAllowed='move';});
     card.addEventListener('dragend',()=>{card.classList.remove('dragging');document.querySelectorAll('.exercise-card').forEach(c=>c.classList.remove('drag-over'));});
@@ -370,11 +424,7 @@ function render(){
     list.appendChild(card);
   });
   if(!currentSession.exercises.length){
-    list.innerHTML=`<div class="empty-state">
-      <div class="empty-state-icon">💪</div>
-      <div class="empty-state-title">Bereit zum Training?</div>
-      <div class="empty-state-sub">Füge deine erste Übung hinzu<br>und leg los.</div>
-    </div>`;
+    list.innerHTML=renderEmpty('💪','Bereit zum Training?','Füge deine erste Übung hinzu<br>und leg los.');
   }
   updateStats();
 }
@@ -382,20 +432,22 @@ function render(){
 // Touch-based drag & drop for mobile
 let touchDragIdx=null,touchClone=null,touchTarget=null;
 document.addEventListener('touchstart',e=>{
+  if(e.target.tagName==='INPUT'||e.target.tagName==='SELECT'||e.target.tagName==='BUTTON')return;
   const handle=e.target.closest('.drag-handle');
   if(!handle)return;
   const card=handle.closest('.exercise-card');
   if(!card)return;
   touchDragIdx=parseInt(card.dataset.idx);
   touchClone=card.cloneNode(true);
-  touchClone.style.cssText='position:fixed;z-index:200;opacity:0.85;pointer-events:none;width:'+card.offsetWidth+'px;transform:scale(0.95);';
+  touchClone.classList.add('drag-clone');
+  touchClone.style.width=card.offsetWidth+'px';
   document.body.appendChild(touchClone);
-  card.style.opacity='0.3';
+  card.classList.add('dragging');
 },{passive:true});
 document.addEventListener('touchmove',e=>{
   if(touchDragIdx===null)return;
   const t=e.touches[0];
-  if(touchClone){touchClone.style.left=(t.clientX-40)+'px';touchClone.style.top=(t.clientY-30)+'px';}
+  if(touchClone){touchClone.style.setProperty('--x',(t.clientX-40)+'px');touchClone.style.setProperty('--y',(t.clientY-30)+'px');}
   const el=document.elementFromPoint(t.clientX,t.clientY);
   const card=el?.closest?.('.exercise-card');
   document.querySelectorAll('.exercise-card').forEach(c=>c.classList.remove('drag-over'));
@@ -405,7 +457,7 @@ document.addEventListener('touchmove',e=>{
 document.addEventListener('touchend',()=>{
   if(touchDragIdx===null)return;
   if(touchClone){touchClone.remove();touchClone=null;}
-  document.querySelectorAll('.exercise-card').forEach(c=>{c.style.opacity='';c.classList.remove('drag-over');});
+  document.querySelectorAll('.exercise-card').forEach(c=>{c.classList.remove('dragging','drag-over');});
   if(touchTarget!==null&&touchTarget!==touchDragIdx){
     const moved=currentSession.exercises.splice(touchDragIdx,1)[0];
     currentSession.exercises.splice(touchTarget,0,moved);
@@ -459,16 +511,19 @@ window.finishTraining = async function(){
   }
 };
 
+// ── SHARED MODAL HELPERS ──
+window.openModal = function(id){document.getElementById(id).classList.add('open');};
+window.closeModal = function(id){document.getElementById(id).classList.remove('open');};
+window.closeModalOnOverlay = function(e,id){if(e.target===document.getElementById(id))window.closeModal(id);};
+
 // ── EXERCISE MODAL ──
-window.openModal = function(){
-  document.getElementById('modal-overlay').classList.add('open');
+window.openExerciseModal = function(){
+  window.openModal('modal-overlay');
   document.getElementById('search').value='';
   document.getElementById('custom-btn').classList.remove('visible');
   filterExercises();
   setTimeout(()=>document.getElementById('search').focus(),300);
 };
-window.closeModal = function(){document.getElementById('modal-overlay').classList.remove('open');}
-window.closeModalOverlay = function(e){if(e.target===document.getElementById('modal-overlay'))window.closeModal();}
 window.filterExercises = function(){
   const q=document.getElementById('search').value.trim(),ql=q.toLowerCase();
   const all=allExercises();
@@ -503,7 +558,7 @@ window.addCustomExercise = async function(){
 };
 window.addExercise = function(name){
   currentSession.exercises.push({name,open:true,sets:[{kg:'',reps:''},{kg:'',reps:''},{kg:'',reps:''}]});
-  scheduleSave();render();window.closeModal();
+  scheduleSave();render();window.closeModal('modal-overlay');
 };
 
 // ── HISTORY ──
@@ -517,7 +572,7 @@ function renderHistory(){
     }
     return true;
   }).sort((a,b)=>b.localeCompare(a));
-  if(!keys.length){list.innerHTML=`<div class="history-empty">Noch keine vergangenen Trainings.<br><br>Trag heute dein erstes Training ein!</div>`;return;}
+  if(!keys.length){list.innerHTML=renderEmpty('🕘','Noch keine vergangenen Trainings','Trag heute dein erstes Training ein!');return;}
   list.innerHTML='';
   keys.forEach(key=>{
     const s=sessions[key];
@@ -589,21 +644,12 @@ function showDetail(key){
       });
     }
     const showExPRBadge=matchCount===1;
-    const vol=ex.sets.reduce((sum,set)=>sum+(parseFloat(set.kg)||0)*(parseFloat(set.reps)||0),0);
-    const rows=ex.sets.map((set,i)=>{
-      const setKg=parseFloat(set.kg)||0;
-      const isPRSet=i===firstMatchIndex;
-      const sv=setKg*(parseFloat(set.reps)||0);
-      return `<tr${isPRSet?' class="pr-row"':''}><td style="color:var(--text-muted);font-family:'Space Grotesk',sans-serif;font-weight:600">${i+1}</td><td>${set.kg||'—'} kg</td><td>${set.reps||'—'}</td><td>${sv>0?Math.round(sv):'—'}</td></tr>`;
-    }).join('');
-    const card=document.createElement('div');
-    card.className=showExPRBadge?'detail-ex-card has-pr':'detail-ex-card';
-    const nameHtml=showExPRBadge
-      ?`${escapeHtml(ex.name)} <span class="pr-badge new-pr">🏆 PR</span>`
-      :escapeHtml(ex.name);
-    card.innerHTML=`<div class="detail-ex-name">${nameHtml}</div>
-      <table class="detail-sets-table"><thead><tr><th>#</th><th>KG</th><th>Wdh</th><th>Vol</th></tr></thead><tbody>${rows}</tbody></table>
-      <div class="detail-ex-vol">Volumen: <span>${Math.round(vol).toLocaleString('de')} kg</span></div>`;
+    const card=renderExerciseCard(ex,{
+      readonly:true,
+      badgeHtml:showExPRBadge?`<span class="pr-badge new-pr">🏆 PR</span>`:'',
+      hasPRClass:showExPRBadge,
+      isPRSet:i=>i===firstMatchIndex,
+    });
     exEl.appendChild(card);
   });
   document.getElementById('detail-notes-wrap').innerHTML=s.notes&&s.notes.trim()?`<div class="sec-label">Notizen</div><div class="detail-notes">${escapeHtml(s.notes)}</div>`:'';
@@ -687,7 +733,7 @@ function renderGoals(){
         <div class="week-goal-count ${done?'done':trained>0?'progress':'zero'}">${trained}<span style="font-size:14px;color:var(--text-muted)">/${goal}</span></div>
       </div>
       <div class="progress-bar-wrap">
-        <div class="progress-bar-bg"><div class="progress-bar-fill${done?' done':''}" style="width:${pct}%"></div></div>
+        <div class="progress-bar-bg"><div class="progress-bar-fill${done?' done':''}" style="--progress:${pct}%"></div></div>
         <div class="progress-bar-label"><span>0</span><span>${goal} Tage</span></div>
       </div>
       <div class="goal-set-row">
@@ -699,9 +745,9 @@ function renderGoals(){
         </div>
       </div>
     </div>
-    <div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:16px">
-      <div style="font-family:'Space Grotesk',sans-serif;font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.08em;font-weight:600;margin-bottom:10px">Diese Woche</div>
-      <div style="display:flex;gap:5px">${weekDotsHtml}</div>
+    <div class="goal-card-inner">
+      <div class="goal-card-inner-label">Diese Woche</div>
+      <div class="goal-card-inner-dots">${weekDotsHtml}</div>
     </div>`;
   renderWeekHistory();
 }
@@ -720,7 +766,7 @@ function renderWeekHistory(){
     if(Object.keys(sessions).some(k=>weekDays.includes(k))){result.push({monday,weekDays,trained});}
   }
   const goal=goals.trainDays||3;const dayNames=['Mo','Di','Mi','Do','Fr','Sa','So'];
-  if(!result.length){list.innerHTML=`<div class="goals-empty">Noch keine Daten aus vergangenen Wochen.</div>`;return;}
+  if(!result.length){list.innerHTML=renderEmpty('🎯','Noch keine Daten','aus vergangenen Wochen.');return;}
   list.innerHTML=result.map(({monday,weekDays,trained})=>{
     const label=monday.getDate()+'.'+(monday.getMonth()+1)+'.';
     const dots=weekDays.map((k,i)=>{const t=sessions[k]&&sessions[k].exercises&&sessions[k].exercises.length>0;return `<div class="week-dot${t?' trained':''}">${dayNames[i]}</div>`;}).join('');
@@ -732,7 +778,7 @@ function renderWeekHistory(){
 // ── TEMPLATES ──
 function renderTemplates(){
   const list=document.getElementById('template-list');
-  if(!templates.length){list.innerHTML=`<div class="templates-empty">Noch keine Vorlagen.<br><br>Erstelle deine erste Vorlage!</div>`;return;}
+  if(!templates.length){list.innerHTML=renderEmpty('📋','Noch keine Vorlagen','Erstelle deine erste Vorlage!');return;}
   list.innerHTML='';
   templates.forEach((tpl,ti)=>{
     const card=document.createElement('div');card.className='template-card';
@@ -758,10 +804,8 @@ window.deleteTemplate = async function(ti){
 window.openTemplateEditor = function(ti){
   if(ti===null){editingTemplate={id:Date.now(),name:'',exercises:[]};document.getElementById('tpl-editor-title').textContent='Neue Vorlage';document.getElementById('tpl-name-input').value='';}
   else{editingTemplate=JSON.parse(JSON.stringify(templates[ti]));editingTemplate._editIdx=ti;document.getElementById('tpl-editor-title').textContent='Vorlage bearbeiten';document.getElementById('tpl-name-input').value=editingTemplate.name;}
-  renderTplExList();document.getElementById('tpl-editor-overlay').classList.add('open');
+  renderTplExList();window.openModal('tpl-editor-overlay');
 };
-window.closeTplEditor = function(){document.getElementById('tpl-editor-overlay').classList.remove('open');editingTemplate=null;}
-window.closeTplEditorOverlay = function(e){if(e.target===document.getElementById('tpl-editor-overlay'))window.closeTplEditor();}
 function renderTplExList(){
   const list=document.getElementById('tpl-ex-list');list.innerHTML='';
   (editingTemplate.exercises||[]).forEach((ex,ei)=>{
@@ -795,15 +839,13 @@ window.saveTemplate = async function(){
   editingTemplate.name=name;
   if(editingTemplate._editIdx!==undefined){templates[editingTemplate._editIdx]=editingTemplate;delete templates[editingTemplate._editIdx]._editIdx;}
   else templates.push(editingTemplate);
-  await saveTemplates();window.closeTplEditor();renderTemplates();
+  await saveTemplates();editingTemplate=null;window.closeModal('tpl-editor-overlay');renderTemplates();
 };
 window.openTplExModal = function(){
-  document.getElementById('tpl-ex-modal-overlay').classList.add('open');
+  window.openModal('tpl-ex-modal-overlay');
   document.getElementById('tpl-search').value='';document.getElementById('tpl-custom-btn').classList.remove('visible');
   filterTplExercises();setTimeout(()=>document.getElementById('tpl-search').focus(),300);
 };
-window.closeTplExModal = function(){document.getElementById('tpl-ex-modal-overlay').classList.remove('open');}
-window.closeTplExModalOverlay = function(e){if(e.target===document.getElementById('tpl-ex-modal-overlay'))window.closeTplExModal();}
 window.filterTplExercises = function(){
   const q=document.getElementById('tpl-search').value.trim(),ql=q.toLowerCase();
   const all=allExercises();const filtered=q?all.filter(e=>e.name.toLowerCase().includes(ql)):all;
@@ -828,21 +870,19 @@ window.addTplCustomExercise = async function(){
 };
 window.addTplExercise = function(name){
   editingTemplate.exercises.push({name,sets:[{kg:'',reps:''},{kg:'',reps:''},{kg:'',reps:''}]});
-  window.closeTplExModal();renderTplExList();
+  window.closeModal('tpl-ex-modal-overlay');renderTplExList();
 };
 window.openImportModal = function(ti){
   importingTemplateId=ti;
   document.getElementById('import-modal-title').textContent=`"${templates[ti].name}" importieren`;
-  document.getElementById('import-modal-overlay').classList.add('open');
+  window.openModal('import-modal-overlay');
 };
-window.closeImportModal = function(){document.getElementById('import-modal-overlay').classList.remove('open');importingTemplateId=null;}
-window.closeImportModalOverlay = function(e){if(e.target===document.getElementById('import-modal-overlay'))window.closeImportModal();}
 window.doImport = function(mode){
   const tpl=templates[importingTemplateId];if(!tpl)return;
   const newEx=tpl.exercises.map(e=>({name:e.name,open:true,sets:e.sets.map(s=>({kg:s.kg||'',reps:s.reps||''}))}));
   if(mode==='replace')currentSession.exercises=newEx;
   else currentSession.exercises=[...currentSession.exercises,...newEx];
-  scheduleSave();window.closeImportModal();window.showPage('today');render();
+  scheduleSave();importingTemplateId=null;window.closeModal('import-modal-overlay');window.showPage('today');render();
 };
 
 // ── BACKLOG / VERGANGENES TRAINING ERFASSEN ──
@@ -854,16 +894,14 @@ window.openBacklogDateModal = function(){
   const input = document.getElementById('backlog-date-input');
   input.max = getTodayKey();
   input.value = '';
-  document.getElementById('backlog-date-modal-overlay').classList.add('open');
+  window.openModal('backlog-date-modal-overlay');
 };
-window.closeBacklogDateModal = function(){document.getElementById('backlog-date-modal-overlay').classList.remove('open');};
-window.closeBacklogDateModalOverlay = function(e){if(e.target===document.getElementById('backlog-date-modal-overlay'))window.closeBacklogDateModal();};
 
 window.confirmBacklogDate = function(){
   const dateStr = document.getElementById('backlog-date-input').value;
   if(!dateStr){alert('Bitte ein Datum auswählen.');return;}
   if(dateStr>getTodayKey()){alert('Datum darf nicht in der Zukunft liegen.');return;}
-  window.closeBacklogDateModal();
+  window.closeModal('backlog-date-modal-overlay');
   backlogKey = dateStr;
   // Track an existing entry so a later date change deletes the original instead of duplicating it
   backlogOriginalKey = sessions[dateStr] ? dateStr : null;
@@ -940,39 +978,15 @@ function renderBacklogExercises(){
   const list=document.getElementById('backlog-exercise-list');
   list.innerHTML='';
   backlogSession.exercises.forEach((ex,ei)=>{
-    const vol=ex.sets.reduce((s,set)=>s+(parseFloat(set.kg)||0)*(parseFloat(set.reps)||0),0);
-    const setsRows=ex.sets.map((s,si)=>{
-      const sv=(parseFloat(s.kg)||0)*(parseFloat(s.reps)||0);
-      return `<tr>
-        <td>${si+1}</td>
-        <td><input class="set-input" type="number" min="0" max="${KG_MAX}" step="0.5" inputmode="decimal" value="${s.kg||''}" placeholder="kg" oninput="updateBacklogSet(${ei},${si},'kg',this)"></td>
-        <td><input class="set-input" type="number" min="0" max="${REPS_MAX}" step="1" inputmode="numeric" value="${s.reps||''}" placeholder="Wdh" oninput="updateBacklogSet(${ei},${si},'reps',this)"></td>
-        <td class="set-vol">${sv>0?Math.round(sv):'—'}</td>
-      </tr>`;
-    }).join('');
-    const card=document.createElement('div');
-    card.className='exercise-card';
-    card.innerHTML=`
-      <div class="exercise-header" onclick="toggleBacklogEx(${ei})">
-        <div class="exercise-name">${escapeHtml(ex.name)}</div>
-        <span class="exercise-toggle${ex.open?' open':''}">▾</span>
-      </div>
-      ${ex.open?`<div class="exercise-body">
-        <table class="sets-table"><thead><tr><th>#</th><th>KG</th><th>Wdh</th><th>Vol</th></tr></thead><tbody>${setsRows}</tbody></table>
-        <button class="add-set-btn" onclick="addBacklogSet(${ei})">+ Satz hinzufügen</button>
-        <div class="exercise-footer">
-          <div><span class="vol-lbl">Volumen</span><span class="vol-val">${Math.round(vol).toLocaleString('de')} kg</span></div>
-          <button class="remove-ex" onclick="removeBacklogEx(${ei})">Entfernen</button>
-        </div>
-      </div>`:''}`;
+    const card=renderExerciseCard(ex,{
+      idx:ei,
+      showDelete:true,
+      namespace:'backlog',
+    });
     list.appendChild(card);
   });
   if(!backlogSession.exercises.length){
-    list.innerHTML=`<div class="empty-state">
-      <div class="empty-state-icon">📅</div>
-      <div class="empty-state-title">Training hinzufügen</div>
-      <div class="empty-state-sub">Füge Übungen für dieses<br>vergangene Training hinzu.</div>
-    </div>`;
+    list.innerHTML=renderEmpty('📅','Training hinzufügen','Füge Übungen für dieses<br>vergangene Training hinzu.');
   }
 }
 
@@ -987,14 +1001,12 @@ window.removeBacklogEx=function(ei){backlogSession.exercises.splice(ei,1);render
 
 // Backlog exercise modal
 window.openBacklogExModal=function(){
-  document.getElementById('backlog-ex-modal-overlay').classList.add('open');
+  window.openModal('backlog-ex-modal-overlay');
   document.getElementById('backlog-search').value='';
   document.getElementById('backlog-custom-btn').classList.remove('visible');
   filterBacklogExercises();
   setTimeout(()=>document.getElementById('backlog-search').focus(),300);
 };
-window.closeBacklogExModal=function(){document.getElementById('backlog-ex-modal-overlay').classList.remove('open');};
-window.closeBacklogExModalOverlay=function(e){if(e.target===document.getElementById('backlog-ex-modal-overlay'))window.closeBacklogExModal();};
 window.filterBacklogExercises=function(){
   const q=document.getElementById('backlog-search').value.trim(),ql=q.toLowerCase();
   const all=allExercises();
@@ -1026,7 +1038,7 @@ window.addBacklogCustomExercise=async function(){
 };
 window.addBacklogExercise=function(name){
   backlogSession.exercises.push({name,open:true,sets:[{kg:'',reps:''},{kg:'',reps:''},{kg:'',reps:''}]});
-  window.closeBacklogExModal();renderBacklogExercises();
+  window.closeModal('backlog-ex-modal-overlay');renderBacklogExercises();
 };
 
 // ── PROGRESS ──

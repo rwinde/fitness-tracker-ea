@@ -13,7 +13,7 @@
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="styles.css">
 <script>
-var APP_VERSION='v2.5.3';
+var APP_VERSION='v2.5.8';
 if('serviceWorker' in navigator){navigator.serviceWorker.getRegistrations().then(regs=>regs.forEach(r=>r.unregister()));}
 // Safari Private Mode and some embedded webviews throw on sessionStorage access.
 // Skipping the one-time cache-buster reload there is acceptable — worst case the user sees stale assets.
@@ -85,7 +85,7 @@ if(document.readyState==='loading'){
     <button class="finish-btn disabled" id="finish-btn" onclick="finishTraining()" disabled>✓ Training abschließen</button>
     <div class="sec-label">Übungen</div>
     <div id="exercise-list"></div>
-    <button class="add-exercise-btn" onclick="openModal()">+ Übung hinzufügen</button>
+    <button class="add-exercise-btn" onclick="openExerciseModal()">+ Übung hinzufügen</button>
     <div class="page-spacer"></div>
     <div class="sec-label">Notizen</div>
     <div class="notes-area"><textarea id="notes" maxlength="2000" placeholder="Wie lief das Training…"></textarea></div>
@@ -203,9 +203,9 @@ if(document.readyState==='loading'){
 </div>
 
 <!-- MODALS -->
-<div class="modal-overlay" id="modal-overlay" onclick="closeModalOverlay(event)">
+<div class="modal-overlay" id="modal-overlay" onclick="closeModalOnOverlay(event,'modal-overlay')">
   <div class="modal" onclick="event.stopPropagation()">
-    <button class="modal-close" onclick="closeModal()">×</button>
+    <button class="modal-close" onclick="closeModal('modal-overlay')">×</button>
     <div class="modal-title">Übung wählen</div>
     <div class="search-row">
       <input class="search-input" id="search" placeholder="Suchen oder eigene eingeben…" oninput="filterExercises()">
@@ -215,9 +215,9 @@ if(document.readyState==='loading'){
   </div>
 </div>
 
-<div class="modal-overlay" id="tpl-editor-overlay" onclick="closeTplEditorOverlay(event)">
+<div class="modal-overlay" id="tpl-editor-overlay" onclick="closeModalOnOverlay(event,'tpl-editor-overlay')">
   <div class="modal" onclick="event.stopPropagation()" style="max-height:88vh">
-    <button class="modal-close" onclick="closeTplEditor()">×</button>
+    <button class="modal-close" onclick="closeModal('tpl-editor-overlay')">×</button>
     <div class="modal-title" id="tpl-editor-title">Vorlage erstellen</div>
     <input class="tpl-input" id="tpl-name-input" maxlength="60" placeholder="Name (z.B. Push Day A)">
     <div class="sec-label">Übungen</div>
@@ -227,9 +227,9 @@ if(document.readyState==='loading'){
   </div>
 </div>
 
-<div class="modal-overlay" id="tpl-ex-modal-overlay" onclick="closeTplExModalOverlay(event)">
+<div class="modal-overlay" id="tpl-ex-modal-overlay" onclick="closeModalOnOverlay(event,'tpl-ex-modal-overlay')">
   <div class="modal" onclick="event.stopPropagation()">
-    <button class="modal-close" onclick="closeTplExModal()">×</button>
+    <button class="modal-close" onclick="closeModal('tpl-ex-modal-overlay')">×</button>
     <div class="modal-title">Übung wählen</div>
     <div class="search-row">
       <input class="search-input" id="tpl-search" placeholder="Suchen…" oninput="filterTplExercises()">
@@ -239,9 +239,9 @@ if(document.readyState==='loading'){
   </div>
 </div>
 
-<div class="modal-overlay" id="import-modal-overlay" onclick="closeImportModalOverlay(event)">
+<div class="modal-overlay" id="import-modal-overlay" onclick="closeModalOnOverlay(event,'import-modal-overlay')">
   <div class="modal" onclick="event.stopPropagation()">
-    <button class="modal-close" onclick="closeImportModal()">×</button>
+    <button class="modal-close" onclick="closeModal('import-modal-overlay')">×</button>
     <div class="modal-title" id="import-modal-title">Vorlage importieren</div>
     <div class="import-option" onclick="doImport('replace')">
       <div class="import-option-icon">↺</div>
@@ -254,9 +254,9 @@ if(document.readyState==='loading'){
   </div>
 </div>
 
-<div class="modal-overlay" id="backlog-ex-modal-overlay" onclick="closeBacklogExModalOverlay(event)">
+<div class="modal-overlay" id="backlog-ex-modal-overlay" onclick="closeModalOnOverlay(event,'backlog-ex-modal-overlay')">
   <div class="modal" onclick="event.stopPropagation()">
-    <button class="modal-close" onclick="closeBacklogExModal()">×</button>
+    <button class="modal-close" onclick="closeModal('backlog-ex-modal-overlay')">×</button>
     <div class="modal-title">Übung wählen</div>
     <div class="search-row">
       <input class="search-input" id="backlog-search" placeholder="Suchen oder eigene eingeben…" oninput="filterBacklogExercises()">
@@ -266,9 +266,9 @@ if(document.readyState==='loading'){
   </div>
 </div>
 
-<div class="modal-overlay" id="backlog-date-modal-overlay" onclick="closeBacklogDateModalOverlay(event)">
+<div class="modal-overlay" id="backlog-date-modal-overlay" onclick="closeModalOnOverlay(event,'backlog-date-modal-overlay')">
   <div class="modal" onclick="event.stopPropagation()" style="border-top-color:#f59e42">
-    <button class="modal-close" onclick="closeBacklogDateModal()">×</button>
+    <button class="modal-close" onclick="closeModal('backlog-date-modal-overlay')">×</button>
     <div class="modal-title" style="color:#f59e42">📅 Vergangenes Training erfassen</div>
     <div style="font-size:13px;color:var(--text-secondary);margin-bottom:16px">Für welches Datum möchtest du ein Training eintragen?</div>
     <input type="date" id="backlog-date-input" style="width:100%;padding:14px 16px;background:var(--surface2);color:var(--text);border:1px solid var(--border);border-radius:var(--radius-sm);font-size:16px;font-family:'DM Sans',sans-serif;-webkit-appearance:none;appearance:none;outline:none;margin-bottom:16px">
@@ -276,6 +276,6 @@ if(document.readyState==='loading'){
   </div>
 </div>
 
-<script type="module" src="app.js?v=v2.5.3"></script>
+<script type="module" src="app.js?v=v2.5.8"></script>
 </body>
 </html>
