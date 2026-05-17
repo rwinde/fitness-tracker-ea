@@ -69,6 +69,27 @@ window.signInWithGoogle = async () => {
 };
 window.signOut = async () => { await fbSignOut(auth); };
 
+window.toggleTheme = function() {
+  const root = document.documentElement;
+  const goingLight = root.getAttribute('data-theme') !== 'light';
+  if (goingLight) root.setAttribute('data-theme', 'light');
+  else root.removeAttribute('data-theme');
+  try { localStorage.setItem('theme', goingLight ? 'light' : 'dark'); } catch(e) {}
+  updateThemeToggleIcon();
+};
+function updateThemeToggleIcon() {
+  const btn = document.getElementById('theme-toggle');
+  if (!btn) return;
+  btn.textContent = document.documentElement.getAttribute('data-theme') === 'light' ? '☀️' : '🌙';
+}
+function applyStoredTheme() {
+  try {
+    if (localStorage.getItem('theme') === 'light') document.documentElement.setAttribute('data-theme', 'light');
+  } catch(e) { /* localStorage unavailable — Safari private mode etc. */ }
+  updateThemeToggleIcon();
+}
+applyStoredTheme();
+
 onAuthStateChanged(auth, async (user) => {
   if(user) {
     currentUser = user;
@@ -76,6 +97,7 @@ onAuthStateChanged(auth, async (user) => {
     document.getElementById('login-screen').style.display = 'none';
     document.getElementById('main-app').style.display = 'block';
     document.getElementById('bottom-nav').style.display = 'flex';
+    document.getElementById('app-controls').style.display = 'flex';
     await loadAllData();
     initUI();
   } else {
@@ -84,6 +106,7 @@ onAuthStateChanged(auth, async (user) => {
     document.getElementById('login-screen').style.display = 'flex';
     document.getElementById('main-app').style.display = 'none';
     document.getElementById('bottom-nav').style.display = 'none';
+    document.getElementById('app-controls').style.display = 'none';
   }
 });
 
@@ -545,14 +568,40 @@ function showDetail(key){
     <div class="stat-card"><div class="stat-num">${totalSets}</div><div class="stat-lbl">Sätze</div></div>
     <div class="stat-card"><div class="stat-num">${Math.round(totalVol).toLocaleString('de')}</div><div class="stat-lbl">kg Total</div></div>`;
   const exEl=document.getElementById('detail-exercises');exEl.innerHTML='';
+  const standingPRs=getStandingPRs();
   (s.exercises||[]).forEach(ex=>{
+    const exNameLower=(ex.name||'').trim().toLowerCase();
+    const standing=standingPRs.get(exNameLower);
+    const isExPR=!!(standing&&standing.dateKey===key);
+    // Find the FIRST set that matches the standing PR + count total matches.
+    // Only the first match gets .pr-row; the 🏆 badge appears only when the
+    // PR kg×reps was hit exactly once in this session (not repeated as
+    // volume training).
+    let firstMatchIndex=-1,matchCount=0;
+    if(isExPR){
+      ex.sets.forEach((set,i)=>{
+        const setKg=parseFloat(set.kg)||0;
+        const setReps=parseInt(set.reps)||0;
+        if(setKg===standing.kg&&setReps===standing.reps){
+          if(firstMatchIndex<0)firstMatchIndex=i;
+          matchCount++;
+        }
+      });
+    }
+    const showExPRBadge=matchCount===1;
     const vol=ex.sets.reduce((sum,set)=>sum+(parseFloat(set.kg)||0)*(parseFloat(set.reps)||0),0);
     const rows=ex.sets.map((set,i)=>{
-      const sv=(parseFloat(set.kg)||0)*(parseFloat(set.reps)||0);
-      return `<tr><td style="color:var(--text-muted);font-family:'Space Grotesk',sans-serif;font-weight:600">${i+1}</td><td>${set.kg||'—'} kg</td><td>${set.reps||'—'}</td><td>${sv>0?Math.round(sv):'—'}</td></tr>`;
+      const setKg=parseFloat(set.kg)||0;
+      const isPRSet=i===firstMatchIndex;
+      const sv=setKg*(parseFloat(set.reps)||0);
+      return `<tr${isPRSet?' class="pr-row"':''}><td style="color:var(--text-muted);font-family:'Space Grotesk',sans-serif;font-weight:600">${i+1}</td><td>${set.kg||'—'} kg</td><td>${set.reps||'—'}</td><td>${sv>0?Math.round(sv):'—'}</td></tr>`;
     }).join('');
-    const card=document.createElement('div');card.className='detail-ex-card';
-    card.innerHTML=`<div class="detail-ex-name">${escapeHtml(ex.name)}</div>
+    const card=document.createElement('div');
+    card.className=showExPRBadge?'detail-ex-card has-pr':'detail-ex-card';
+    const nameHtml=showExPRBadge
+      ?`${escapeHtml(ex.name)} <span class="pr-badge new-pr">🏆 PR</span>`
+      :escapeHtml(ex.name);
+    card.innerHTML=`<div class="detail-ex-name">${nameHtml}</div>
       <table class="detail-sets-table"><thead><tr><th>#</th><th>KG</th><th>Wdh</th><th>Vol</th></tr></thead><tbody>${rows}</tbody></table>
       <div class="detail-ex-vol">Volumen: <span>${Math.round(vol).toLocaleString('de')} kg</span></div>`;
     exEl.appendChild(card);
@@ -987,34 +1036,208 @@ function renderProgress(){
   renderProgressChart();
 }
 
+function getStandingPRs(){
+  // Per-exercise standing PR — single source of truth used by the heatmap
+  // (via getPRDays) and the session detail view (to highlight PR sets).
+  // Returns Map<normalizedName, {dateKey, kg, reps, displayName}>.
+  //
+  // "Standing PR" = the FIRST session where the all-time best kg×reps was
+  // achieved. A later session that TIES the standing best is NOT a PR
+  // (strict > comparison only). First date wins on ties.
+  //
+  // Names are normalized (trim + lowercase) so casing/whitespace variants
+  // count as one exercise.
+  const exMap={}; // normalized name -> {displayName, maxKg, maxReps, prDate}
+  // Walk sessions in chronological order (ISO date keys sort lex-= chrono).
+  // Only update the PR date when a set STRICTLY beats the running all-time
+  // max — equal kg×reps leaves the existing prDate (= first occurrence) in
+  // place.
+  const sortedKeys=Object.keys(sessions).sort();
+  for(const key of sortedKeys){
+    const s=sessions[key];
+    (s.exercises||[]).forEach(ex=>{
+      const display=(ex.name||'').trim();
+      const name=display.toLowerCase();
+      if(!name)return;
+      if(!exMap[name])exMap[name]={displayName:display,maxKg:0,maxReps:0,prDate:null};
+      const entry=exMap[name];
+      (ex.sets||[]).forEach(set=>{
+        const kg=parseFloat(set.kg)||0;
+        const reps=parseInt(set.reps)||0;
+        if(kg<=0)return;
+        if(kg>entry.maxKg||(kg===entry.maxKg&&reps>entry.maxReps)){
+          entry.maxKg=kg;entry.maxReps=reps;entry.prDate=key;
+        }
+      });
+    });
+  }
+  const result=new Map();
+  Object.entries(exMap).forEach(([name,entry])=>{
+    if(entry.prDate){
+      result.set(name,{dateKey:entry.prDate,kg:entry.maxKg,reps:entry.maxReps,displayName:entry.displayName});
+    }
+  });
+  return result;
+}
+
+function getPRDays(){
+  // Derived from getStandingPRs: Map<dateKey, displayName[]> for heatmap labels.
+  // .has(key) works identically to Set.has(key) so existing call sites are
+  // unaffected; .get(key) gives the list of exercise display names.
+  const prMap=new Map();
+  getStandingPRs().forEach(entry=>{
+    if(!prMap.has(entry.dateKey))prMap.set(entry.dateKey,[]);
+    prMap.get(entry.dateKey).push(entry.displayName);
+  });
+  prMap.forEach(names=>names.sort((a,b)=>a.localeCompare(b,'de')));
+  return prMap;
+}
+
+function getPRLabel(names){
+  if(!names||names.length===0)return '';
+  const first=(names[0]||'').trim().substring(0,3).toUpperCase();
+  return names.length===1?first:first+'+'+(names.length-1);
+}
+
+// Heatmap view state
+let heatmapView='month';
+let heatmapFocus=new Date();
+
+window.setHeatmapView=function(view){
+  if(view!=='month'&&view!=='year')return;
+  heatmapView=view;
+  document.getElementById('hm-view-month').classList.toggle('active',view==='month');
+  document.getElementById('hm-view-year').classList.toggle('active',view==='year');
+  renderHeatmap();
+};
+
+window.navHeatmap=function(delta){
+  if(heatmapView==='month'){
+    heatmapFocus=new Date(heatmapFocus.getFullYear(),heatmapFocus.getMonth()+delta,1);
+  }else{
+    heatmapFocus=new Date(heatmapFocus.getFullYear()+delta,heatmapFocus.getMonth(),1);
+  }
+  renderHeatmap();
+};
+
 function renderHeatmap(){
-  const today=new Date();
-  const grid=document.getElementById('heatmap');
-  grid.innerHTML='';
-  const totalWeeks=8;
-  const endMonday=getMondayOfWeek(today);
-  const startMonday=new Date(endMonday);
-  startMonday.setDate(startMonday.getDate()-((totalWeeks-1)*7));
-  for(let w=0;w<totalWeeks;w++){
-    for(let d=0;d<7;d++){
-      const date=new Date(startMonday);
-      date.setDate(date.getDate()+(w*7)+d);
+  const container=document.getElementById('heatmap');
+  const label=document.getElementById('hm-nav-label');
+  if(!container||!label)return;
+  container.innerHTML='';
+  const prDays=getPRDays();
+  const todayKey=getTodayKey();
+  if(heatmapView==='month'){
+    label.textContent=monthsFull[heatmapFocus.getMonth()]+' '+heatmapFocus.getFullYear();
+    renderHeatmapMonth(heatmapFocus.getFullYear(),heatmapFocus.getMonth(),container,prDays,todayKey);
+  }else{
+    label.textContent=String(heatmapFocus.getFullYear());
+    renderHeatmapYear(heatmapFocus.getFullYear(),container,prDays,todayKey);
+  }
+}
+
+function renderHeatmapMonth(year,month,container,prDays,todayKey){
+  const labels=document.createElement('div');
+  labels.className='heatmap-labels';
+  DAYS.forEach(d=>{
+    const span=document.createElement('span');
+    span.textContent=d;
+    labels.appendChild(span);
+  });
+  container.appendChild(labels);
+  const grid=document.createElement('div');
+  grid.className='heatmap-grid';
+  container.appendChild(grid);
+  const firstDay=new Date(year,month,1);
+  const firstWeekday=(firstDay.getDay()+6)%7; // Monday=0
+  const daysInMonth=new Date(year,month+1,0).getDate();
+  for(let i=0;i<firstWeekday;i++){
+    const cell=document.createElement('div');
+    cell.className='heatmap-cell empty';
+    grid.appendChild(cell);
+  }
+  for(let day=1;day<=daysInMonth;day++){
+    const date=new Date(year,month,day);
+    const key=localDateKey(date);
+    const s=sessions[key];
+    const exCount=s&&s.exercises?s.exercises.length:0;
+    const hasPR=prDays.has(key);
+    const prNames=hasPR?prDays.get(key):null;
+    const isToday=key===todayKey;
+    let cellClass='heatmap-cell';
+    if(hasPR)cellClass+=' pr';
+    else if(exCount>0)cellClass+=' trained';
+    if(isToday)cellClass+=' today';
+    const cell=document.createElement('div');
+    cell.className=cellClass;
+    if(hasPR){
+      const dayDiv=document.createElement('div');
+      dayDiv.className='heatmap-cell-day';
+      dayDiv.textContent=day;
+      cell.appendChild(dayDiv);
+      const labelDiv=document.createElement('div');
+      labelDiv.className='heatmap-cell-pr-label';
+      labelDiv.textContent=getPRLabel(prNames);
+      cell.appendChild(labelDiv);
+    }else{
+      cell.textContent=day;
+    }
+    const prSuffix=hasPR&&prNames&&prNames.length?' · 🏆 PR ('+prNames.join(', ')+')':'';
+    cell.title=day+'. '+months[month]+' '+year+(exCount?' — '+exCount+' Übungen'+prSuffix:' — kein Training');
+    if(hasPR||exCount>0){
+      cell.addEventListener('click',()=>showDetail(key));
+    }
+    grid.appendChild(cell);
+  }
+}
+
+function renderHeatmapYear(year,container,prDays,todayKey){
+  const yearGrid=document.createElement('div');
+  yearGrid.className='heatmap-year';
+  container.appendChild(yearGrid);
+  for(let m=0;m<12;m++){
+    const monthWrap=document.createElement('div');
+    monthWrap.className='heatmap-year-month';
+    const monthLabel=document.createElement('div');
+    monthLabel.className='heatmap-year-month-label';
+    monthLabel.textContent=months[m];
+    monthWrap.appendChild(monthLabel);
+    const dayLabels=document.createElement('div');
+    dayLabels.className='heatmap-year-day-labels';
+    DAYS.forEach(d=>{
+      const span=document.createElement('span');
+      span.textContent=d;
+      dayLabels.appendChild(span);
+    });
+    monthWrap.appendChild(dayLabels);
+    const monthGrid=document.createElement('div');
+    monthGrid.className='heatmap-year-grid';
+    const firstDay=new Date(year,m,1);
+    const firstWeekday=(firstDay.getDay()+6)%7;
+    const daysInMonth=new Date(year,m+1,0).getDate();
+    for(let i=0;i<firstWeekday;i++){
+      const cell=document.createElement('div');
+      cell.className='heatmap-year-cell empty';
+      monthGrid.appendChild(cell);
+    }
+    for(let day=1;day<=daysInMonth;day++){
+      const date=new Date(year,m,day);
       const key=localDateKey(date);
-      const dayNum=date.getDate();
       const s=sessions[key];
       const exCount=s&&s.exercises?s.exercises.length:0;
-      let lvl='';
-      if(exCount>=7)lvl='l4';
-      else if(exCount>=5)lvl='l3';
-      else if(exCount>=3)lvl='l2';
-      else if(exCount>=1)lvl='l1';
-      const isToday=key===getTodayKey();
+      const hasPR=prDays.has(key);
+      const isToday=key===todayKey;
+      let cellClass='heatmap-year-cell';
+      if(hasPR)cellClass+=' pr';
+      else if(exCount>0)cellClass+=' trained';
+      if(isToday)cellClass+=' today';
       const cell=document.createElement('div');
-      cell.className='heatmap-cell'+(lvl?' '+lvl:'')+(isToday?' today-cell':'');
-      cell.textContent=dayNum;
-      cell.title=dayNum+'.'+(date.getMonth()+1)+'.'+(exCount?' — '+exCount+' Übungen':' — kein Training');
-      grid.appendChild(cell);
+      cell.className=cellClass;
+      cell.title=day+'. '+months[m]+' '+year+(exCount?' — '+exCount+' Übungen'+(hasPR?' · 🏆 PR':''):'');
+      monthGrid.appendChild(cell);
     }
+    monthWrap.appendChild(monthGrid);
+    yearGrid.appendChild(monthWrap);
   }
 }
 

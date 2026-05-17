@@ -13,7 +13,7 @@
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="styles.css">
 <script>
-var APP_VERSION='v2.4.2';
+var APP_VERSION='v2.5.3';
 if('serviceWorker' in navigator){navigator.serviceWorker.getRegistrations().then(regs=>regs.forEach(r=>r.unregister()));}
 // Safari Private Mode and some embedded webviews throw on sessionStorage access.
 // Skipping the one-time cache-buster reload there is acceptable — worst case the user sees stale assets.
@@ -71,7 +71,6 @@ if(document.readyState==='loading'){
         <div class="hero-divider"></div>
         <div class="hero-date" id="datedisp"></div>
         <div class="hero-month" id="monthdisp"></div>
-        <div class="hero-user"><span id="user-name"></span><button class="logout-btn" onclick="signOut()">Abmelden</button></div>
         <div style="font-size:10px;color:var(--text-muted);font-family:'Space Grotesk',sans-serif;letter-spacing:0.04em;margin-top:2px" id="version-display"></div>
       </div>
     </div>
@@ -106,8 +105,8 @@ if(document.readyState==='loading'){
         <div class="detail-sub" id="detail-sub"></div>
       </div>
       <div style="display:flex;gap:6px;flex-shrink:0;padding-top:2px">
-        <button onclick="editSession()" style="padding:8px 14px;background:var(--accent);border:none;border-radius:var(--radius-xs);font-family:'DM Sans',sans-serif;font-size:12px;font-weight:600;color:#fff;cursor:pointer;white-space:nowrap">✎ Edit</button>
-        <button onclick="deleteSession()" style="padding:8px 10px;background:rgba(255,107,107,0.1);border:1px solid rgba(255,107,107,0.25);border-radius:var(--radius-xs);font-family:'DM Sans',sans-serif;font-size:12px;font-weight:600;color:var(--red);cursor:pointer">✕</button>
+        <button class="btn btn--primary btn--sm" onclick="editSession()">✎ Edit</button>
+        <button class="btn btn--destructive btn--sm" onclick="deleteSession()">✕</button>
       </div>
     </div>
     <div class="stats-row" id="detail-stats"></div>
@@ -144,8 +143,8 @@ if(document.readyState==='loading'){
     <div class="sec-label">Notizen</div>
     <div class="notes-area"><textarea id="backlog-notes" maxlength="2000" placeholder="Wie lief das Training…"></textarea></div>
     <div style="margin-top:16px;display:flex;gap:8px;margin-bottom:80px">
-      <button onclick="cancelBacklog()" style="flex:1;padding:14px;background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius-sm);font-family:'Space Grotesk',sans-serif;font-size:14px;font-weight:600;color:var(--text-secondary);cursor:pointer">Abbrechen</button>
-      <button onclick="saveBacklog()" style="flex:2;padding:14px;background:#f59e42;border:none;border-radius:var(--radius-sm);font-family:'Space Grotesk',sans-serif;font-size:14px;font-weight:700;color:#1a1400;cursor:pointer">Training speichern</button>
+      <button class="btn btn--secondary" style="flex:1" onclick="cancelBacklog()">Abbrechen</button>
+      <button class="btn btn--warm" style="flex:2" onclick="saveBacklog()">Training speichern</button>
     </div>
   </div>
 
@@ -159,9 +158,24 @@ if(document.readyState==='loading'){
     <div class="page-title">Fortschritt</div>
     <div class="chart-card">
       <div class="chart-title">Trainingsfrequenz</div>
-      <div class="chart-sub">Letzte 8 Wochen</div>
-      <div class="heatmap-labels"><span>Mo</span><span>Di</span><span>Mi</span><span>Do</span><span>Fr</span><span>Sa</span><span>So</span></div>
-      <div class="heatmap-grid" id="heatmap"></div>
+      <div class="heatmap-controls">
+        <div class="heatmap-view-toggle">
+          <button class="heatmap-view-btn active" id="hm-view-month" onclick="setHeatmapView('month')">Monat</button>
+          <button class="heatmap-view-btn" id="hm-view-year" onclick="setHeatmapView('year')">Jahr</button>
+        </div>
+        <div class="heatmap-nav">
+          <button class="heatmap-nav-btn" onclick="navHeatmap(-1)" aria-label="Zurück">←</button>
+          <span class="heatmap-nav-label" id="hm-nav-label"></span>
+          <button class="heatmap-nav-btn" onclick="navHeatmap(1)" aria-label="Vor">→</button>
+        </div>
+      </div>
+      <div id="heatmap"></div>
+      <div class="heatmap-legend">
+        <span class="heatmap-legend-item"><span class="heatmap-legend-dot trained"></span>Training</span>
+        <span class="heatmap-legend-item"><span class="heatmap-legend-dot pr"></span>PR</span>
+        <span class="heatmap-legend-item"><span class="heatmap-legend-dot today"></span>Heute</span>
+        <span class="heatmap-legend-item"><span class="heatmap-legend-dot"></span>Pause</span>
+      </div>
     </div>
     <div class="chart-card">
       <div class="chart-title">Gewichtsentwicklung</div>
@@ -172,6 +186,12 @@ if(document.readyState==='loading'){
     </div>
   </div>
 
+</div>
+
+<div class="app-controls" id="app-controls" style="display:none">
+  <span id="user-name"></span>
+  <button class="theme-toggle" id="theme-toggle" onclick="toggleTheme()" aria-label="Theme umschalten">🌙</button>
+  <button class="logout-btn" onclick="signOut()">Abmelden</button>
 </div>
 
 <div class="bottom-nav" id="bottom-nav" style="display:none">
@@ -252,10 +272,10 @@ if(document.readyState==='loading'){
     <div class="modal-title" style="color:#f59e42">📅 Vergangenes Training erfassen</div>
     <div style="font-size:13px;color:var(--text-secondary);margin-bottom:16px">Für welches Datum möchtest du ein Training eintragen?</div>
     <input type="date" id="backlog-date-input" style="width:100%;padding:14px 16px;background:var(--surface2);color:var(--text);border:1px solid var(--border);border-radius:var(--radius-sm);font-size:16px;font-family:'DM Sans',sans-serif;-webkit-appearance:none;appearance:none;outline:none;margin-bottom:16px">
-    <button onclick="confirmBacklogDate()" style="width:100%;padding:14px;background:#f59e42;border:none;border-radius:var(--radius-sm);font-family:'Space Grotesk',sans-serif;font-size:15px;font-weight:700;color:#1a1400;cursor:pointer;transition:all 0.15s">Weiter</button>
+    <button class="btn btn--warm btn--block" onclick="confirmBacklogDate()">Weiter</button>
   </div>
 </div>
 
-<script type="module" src="app.js"></script>
+<script type="module" src="app.js?v=v2.5.3"></script>
 </body>
 </html>
