@@ -260,7 +260,7 @@ html.standalone .app{padding-top:calc(env(safe-area-inset-top,47px) + 60px);padd
 .progress-bar-label{display:flex;justify-content:space-between;font-size:var(--text-size-sm);color:var(--text-muted);margin-top:6px;font-weight:500}
 .goal-card-inner{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:var(--space-16)}
 .goal-card-inner-label{font-family:'Space Grotesk',sans-serif;font-size:var(--text-size-xs);color:var(--text-muted);text-transform:uppercase;letter-spacing:0.08em;font-weight:600;margin-bottom:10px}
-.goal-card-inner-dots{display:flex;gap:5px}
+.goal-card-inner-dots{display:flex;flex-direction:row;flex-wrap:nowrap;gap:5px}
 .goal-set-row{padding:var(--space-12) var(--space-16);display:flex;align-items:center;gap:10px;border-top:1px solid var(--border)}
 .goal-set-label{font-size:15px;color:var(--text-secondary);flex:1}
 .goal-stepper{display:flex;align-items:center;gap:10px}
