@@ -144,6 +144,8 @@ async function loadAllData() {
     templates = tplSnap.exists() ? (tplSnap.data().list || []) : [];
     customExercises = custSnap.exists() ? (custSnap.data().list || []) : [];
     goals = goalsSnap.exists() ? goalsSnap.data() : {trainDays: 3};
+    // Catch up templates with records logged on another device
+    syncTemplatesWithBests();
     setSyncStatus('synced', '✓ Synchronisiert');
     setTimeout(() => setSyncStatus('', 'Bereit'), 2000);
   } catch(e) {
@@ -162,6 +164,7 @@ async function saveSession() {
     await setDoc(doc(db, 'users', currentUser.uid, 'sessions', key), currentSession);
     sessions[key] = structuredClone(currentSession);
     invalidatePRCache();
+    syncTemplatesWithBests(); // fire-and-forget, handles its own errors
     setSyncStatus('synced', '✓ Gespeichert');
     setTimeout(() => setSyncStatus('', 'Bereit'), 1500);
     return true;
@@ -735,6 +738,7 @@ window.deleteSession = async function(){
     await deleteDoc(doc(db,'users',currentUser.uid,'sessions',currentDetailKey));
     delete sessions[currentDetailKey];
     invalidatePRCache();
+    syncTemplatesWithBests();
     // If deleting today's session, reset currentSession too
     if(currentDetailKey===getTodayKey()){
       currentSession={exercises:[],notes:''};
@@ -829,6 +833,33 @@ function renderWeekHistory(){
 }
 
 // ── TEMPLATES ──
+// Templates always mirror the current all-time record: every set of a
+// template exercise is overwritten with the heaviest set ever logged for
+// that exercise (kg + that set's reps), INCLUDING today's session — so a
+// new record during a workout lands in the template immediately. The best
+// value always wins, even over manually entered template values; exercises
+// without any logged set keep their stored values. Recomputed from the full
+// history on every call, so it is idempotent and self-correcting (deleting
+// a record session lowers the template again). Persists only on change.
+// Must be called wherever `sessions` is mutated.
+async function syncTemplatesWithBests(){
+  if(!templates.length)return;
+  const bests=buildPRCache(null); // null = no day excluded, today counts
+  let changed=false;
+  templates.forEach(tpl=>{
+    (tpl.exercises||[]).forEach(ex=>{
+      const best=bests.get(ex.name);
+      if(!best)return;
+      const kg=String(best.kg);
+      const reps=best.reps>0?String(best.reps):'';
+      ex.sets.forEach(s=>{
+        if(s.kg!==kg||s.reps!==reps){s.kg=kg;s.reps=reps;changed=true;}
+      });
+    });
+  });
+  if(changed)await saveTemplates();
+}
+
 function renderTemplates(){
   const list=document.getElementById('template-list');
   if(!templates.length){list.innerHTML=renderEmpty('📋','Noch keine Vorlagen','Erstelle deine erste Vorlage!');return;}
@@ -994,6 +1025,7 @@ window.saveBacklog = async function(){
     await setDoc(doc(db,'users',currentUser.uid,'sessions',backlogKey),backlogSession);
     sessions[backlogKey]=structuredClone(backlogSession);
     invalidatePRCache();
+    syncTemplatesWithBests();
     // If saving to today, update currentSession too
     if(backlogKey===getTodayKey()){
       currentSession=structuredClone(backlogSession);
