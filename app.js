@@ -553,33 +553,57 @@ window.openExerciseModal = function(){
   filterExercises();
   setTimeout(()=>document.getElementById('search').focus(),300);
 };
-window.filterExercises = function(){
-  const q=document.getElementById('search').value.trim(),ql=q.toLowerCase();
+// Shared filter for the three exercise-picker modals (today / template /
+// backlog). They only differ in element ids, whether the muscle group is
+// searchable, and which extras (PR line, "eigene"-badge) are shown.
+// cfg: {searchId, btnId, optionsId, matchMuscle, showPR, showCustomBadge, emptyText}
+function filterExercisePicker(cfg){
+  const q=document.getElementById(cfg.searchId).value.trim(),ql=q.toLowerCase();
   const all=allExercises();
-  const filtered=q?all.filter(e=>e.name.toLowerCase().includes(ql)||e.muscle.toLowerCase().includes(ql)):all;
+  const filtered=q?all.filter(e=>e.name.toLowerCase().includes(ql)||(cfg.matchMuscle&&e.muscle.toLowerCase().includes(ql))):all;
   const exactMatch=all.some(e=>e.name.toLowerCase()===ql);
-  const btn=document.getElementById('custom-btn');
+  const btn=document.getElementById(cfg.btnId);
   if(q&&!exactMatch){btn.textContent=`"${q}" neu`;btn.classList.add('visible');}
   else btn.classList.remove('visible');
-  const opts=document.getElementById('exercise-options');
-  if(!filtered.length){opts.innerHTML=`<div class="no-results">Keine Übung gefunden — oben als neue hinzufügen.</div>`;return;}
+  const opts=document.getElementById(cfg.optionsId);
+  if(!filtered.length){opts.innerHTML=`<div class="no-results">${cfg.emptyText}</div>`;return;}
   const grouped={};
   filtered.forEach(e=>{if(!grouped[e.muscle])grouped[e.muscle]=[];grouped[e.muscle].push(e);});
+  const showLabels=Object.keys(grouped).length>1;
   let html='';
   Object.entries(grouped).forEach(([muscle,exs])=>{
-    if(Object.keys(grouped).length>1)html+=`<div class="muscle-label">${muscle}</div>`;
+    if(showLabels)html+=`<div class="muscle-label">${muscle}</div>`;
     exs.forEach(e=>{
-      const pr=getExPR(e.name);
-      const isCustom=e.muscle==='Eigene';
-      const prText=pr?`PR: <span>${pr.kg}kg × ${pr.reps} Wdh</span>`:`<span style="color:var(--text-muted)">Noch kein Eintrag</span>`;
+      const isCustom=cfg.showCustomBadge&&e.muscle==='Eigene';
+      const badge=isCustom?' <span style="font-size:10px;color:var(--accent)">✓ eigene</span>':'';
+      let prHtml='';
+      if(cfg.showPR){
+        const pr=getExPR(e.name);
+        const prText=pr?`PR: <span>${pr.kg}kg × ${pr.reps} Wdh</span>`:`<span style="color:var(--text-muted)">Noch kein Eintrag</span>`;
+        prHtml=`<div class="exercise-option-pr">${prText}</div>`;
+      }
       html+=`<div class="exercise-option${isCustom?' custom':''}" data-name="${escapeHtml(e.name)}">
-        <div class="exercise-option-name">${escapeHtml(e.name)}${isCustom?' <span style="font-size:10px;color:var(--accent)">✓ eigene</span>':''}</div>
-        <div class="exercise-option-pr">${prText}</div>
+        <div class="exercise-option-name">${escapeHtml(e.name)}${badge}</div>${prHtml}
       </div>`;
     });
   });
   opts.innerHTML=html;
-};
+}
+window.filterExercises = ()=>filterExercisePicker({
+  searchId:'search',btnId:'custom-btn',optionsId:'exercise-options',
+  matchMuscle:true,showPR:true,showCustomBadge:true,
+  emptyText:'Keine Übung gefunden — oben als neue hinzufügen.',
+});
+window.filterTplExercises = ()=>filterExercisePicker({
+  searchId:'tpl-search',btnId:'tpl-custom-btn',optionsId:'tpl-exercise-options',
+  matchMuscle:false,showPR:false,showCustomBadge:false,
+  emptyText:'Keine Übung gefunden.',
+});
+window.filterBacklogExercises = ()=>filterExercisePicker({
+  searchId:'backlog-search',btnId:'backlog-custom-btn',optionsId:'backlog-exercise-options',
+  matchMuscle:true,showPR:false,showCustomBadge:true,
+  emptyText:'Keine Übung gefunden — oben als neue hinzufügen.',
+});
 window.addCustomExercise = async function(){
   const name=await ensureCustomExercise(document.getElementById('search').value);
   if(!name)return;
@@ -746,11 +770,10 @@ function renderGoals(){
   const monday=getMondayOfWeek(today);const weekDays=getWeekDays(monday);
   const trained=countTrainedDays(weekDays);const goal=goals.trainDays||3;
   const pct=Math.min(100,Math.round((trained/goal)*100));const done=trained>=goal;
-  const dayNames=['Mo','Di','Mi','Do','Fr','Sa','So'];
   const weekDotsHtml=weekDays.map((k,i)=>{
     const t=sessions[k]&&sessions[k].exercises&&sessions[k].exercises.length>0;
     const isToday=k===getTodayKey();
-    return `<div style="flex:1;text-align:center"><div class="week-dot${t?' trained':''}${isToday?' today':''}" style="margin:0 auto;width:100%;max-width:38px">${dayNames[i]}</div></div>`;
+    return `<div style="flex:1;text-align:center"><div class="week-dot${t?' trained':''}${isToday?' today':''}" style="margin:0 auto;width:100%;max-width:38px">${DAYS[i]}</div></div>`;
   }).join('');
   document.getElementById('goals-content').innerHTML=`
     <div class="week-goal-card">
@@ -795,11 +818,11 @@ function renderWeekHistory(){
     const trained=countTrainedDays(weekDays);
     if(Object.keys(sessions).some(k=>weekDays.includes(k))){result.push({monday,weekDays,trained});}
   }
-  const goal=goals.trainDays||3;const dayNames=['Mo','Di','Mi','Do','Fr','Sa','So'];
+  const goal=goals.trainDays||3;
   if(!result.length){list.innerHTML=renderEmpty('🎯','Noch keine Daten','aus vergangenen Wochen.');return;}
   list.innerHTML=result.map(({monday,weekDays,trained})=>{
     const label=monday.getDate()+'.'+(monday.getMonth()+1)+'.';
-    const dots=weekDays.map((k,i)=>{const t=sessions[k]&&sessions[k].exercises&&sessions[k].exercises.length>0;return `<div class="week-dot${t?' trained':''}">${dayNames[i]}</div>`;}).join('');
+    const dots=weekDays.map((k,i)=>{const t=sessions[k]&&sessions[k].exercises&&sessions[k].exercises.length>0;return `<div class="week-dot${t?' trained':''}">${DAYS[i]}</div>`;}).join('');
     const hit=trained>=goal;
     return `<div class="week-row"><div class="week-row-label">Ab ${label}</div><div class="week-row-dots">${dots}</div><div class="week-row-result ${hit?'hit':'miss'}">${trained}/${goal}</div></div>`;
   }).join('');
@@ -875,23 +898,6 @@ window.openTplExModal = function(){
   window.openModal('tpl-ex-modal-overlay');
   document.getElementById('tpl-search').value='';document.getElementById('tpl-custom-btn').classList.remove('visible');
   filterTplExercises();setTimeout(()=>document.getElementById('tpl-search').focus(),300);
-};
-window.filterTplExercises = function(){
-  const q=document.getElementById('tpl-search').value.trim(),ql=q.toLowerCase();
-  const all=allExercises();const filtered=q?all.filter(e=>e.name.toLowerCase().includes(ql)):all;
-  const exactMatch=all.some(e=>e.name.toLowerCase()===ql);
-  const btn=document.getElementById('tpl-custom-btn');
-  if(q&&!exactMatch){btn.textContent=`"${q}" neu`;btn.classList.add('visible');}
-  else btn.classList.remove('visible');
-  const opts=document.getElementById('tpl-exercise-options');
-  if(!filtered.length){opts.innerHTML=`<div class="no-results">Keine Übung gefunden.</div>`;return;}
-  const grouped={};filtered.forEach(e=>{if(!grouped[e.muscle])grouped[e.muscle]=[];grouped[e.muscle].push(e);});
-  let html='';
-  Object.entries(grouped).forEach(([muscle,exs])=>{
-    if(Object.keys(grouped).length>1)html+=`<div class="muscle-label">${muscle}</div>`;
-    exs.forEach(e=>{html+=`<div class="exercise-option" data-name="${escapeHtml(e.name)}"><div class="exercise-option-name">${escapeHtml(e.name)}</div></div>`;});
-  });
-  opts.innerHTML=html;
 };
 window.addTplCustomExercise = async function(){
   const name=await ensureCustomExercise(document.getElementById('tpl-search').value);
@@ -1037,30 +1043,6 @@ window.openBacklogExModal=function(){
   document.getElementById('backlog-custom-btn').classList.remove('visible');
   filterBacklogExercises();
   setTimeout(()=>document.getElementById('backlog-search').focus(),300);
-};
-window.filterBacklogExercises=function(){
-  const q=document.getElementById('backlog-search').value.trim(),ql=q.toLowerCase();
-  const all=allExercises();
-  const filtered=q?all.filter(e=>e.name.toLowerCase().includes(ql)||e.muscle.toLowerCase().includes(ql)):all;
-  const exactMatch=all.some(e=>e.name.toLowerCase()===ql);
-  const btn=document.getElementById('backlog-custom-btn');
-  if(q&&!exactMatch){btn.textContent=`"${q}" neu`;btn.classList.add('visible');}
-  else btn.classList.remove('visible');
-  const opts=document.getElementById('backlog-exercise-options');
-  if(!filtered.length){opts.innerHTML=`<div class="no-results">Keine Übung gefunden — oben als neue hinzufügen.</div>`;return;}
-  const grouped={};
-  filtered.forEach(e=>{if(!grouped[e.muscle])grouped[e.muscle]=[];grouped[e.muscle].push(e);});
-  let html='';
-  Object.entries(grouped).forEach(([muscle,exs])=>{
-    if(Object.keys(grouped).length>1)html+=`<div class="muscle-label">${muscle}</div>`;
-    exs.forEach(e=>{
-      const isCustom=e.muscle==='Eigene';
-      html+=`<div class="exercise-option${isCustom?' custom':''}" data-name="${escapeHtml(e.name)}">
-        <div class="exercise-option-name">${escapeHtml(e.name)}${isCustom?' <span style="font-size:10px;color:var(--accent)">✓ eigene</span>':''}</div>
-      </div>`;
-    });
-  });
-  opts.innerHTML=html;
 };
 window.addBacklogCustomExercise=async function(){
   const name=await ensureCustomExercise(document.getElementById('backlog-search').value);
