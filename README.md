@@ -29,6 +29,8 @@ users/{uid}/
 
 Datums-Keys werden immer in **lokaler Zeitzone** gebildet (`localDateKey`), um UTC-Verschiebungen zu vermeiden. Offline-Persistenz (`persistentLocalCache`) ist aktiviert: Die App funktioniert ohne Netz weiter und synchronisiert, sobald wieder Verbindung besteht.
 
+**Vorlagen spiegeln automatisch den Allzeit-Bestwert:** Nach jedem gespeicherten Training (auch nachgetragenen) werden alle Sätze jeder Vorlagen-Übung mit dem schwersten je geloggten Satz dieser Übung überschrieben (kg + dessen Wiederholungen, `syncTemplatesWithBests` in `app.js`). Der Bestwert gewinnt dabei immer — auch über manuell in der Vorlage eingetragene Werte. Übungen ohne Trainingshistorie behalten ihre gespeicherten Werte.
+
 ### Sicherheit
 
 Der Firebase-Web-API-Key in `app.js` ist **kein Geheimnis** — er identifiziert nur das Projekt. Der Zugriffsschutz läuft über Firebase Authentication plus Firestore Security Rules, die in der Firebase-Konsole so konfiguriert sein müssen, dass jeder Nutzer ausschließlich `users/{eigene uid}/**` lesen/schreiben darf. Alle nutzergenerierten Strings werden vor dem Einfügen in `innerHTML` mit `escapeHtml` maskiert.
