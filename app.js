@@ -173,12 +173,14 @@ applyStoredTheme();
 onAuthStateChanged(auth, async (user) => {
   if(user) {
     currentUser = user;
-    document.getElementById('loading-screen').style.display = 'none';
     document.getElementById('login-screen').style.display = 'none';
+    // Daten hinter dem Loading-Screen laden, damit die App in einem
+    // einzigen Schritt fertig gerendert erscheint (kein "Doppel-Laden" in der PWA)
+    await loadAllData();
+    document.getElementById('loading-screen').style.display = 'none';
     document.getElementById('main-app').style.display = 'block';
     document.getElementById('bottom-nav').style.display = 'flex';
     document.getElementById('app-controls').style.display = 'flex';
-    await loadAllData();
     initUI();
   } else {
     currentUser = null;
