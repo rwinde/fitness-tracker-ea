@@ -8,23 +8,21 @@
   --accent-bright:#ecd9a8;--accent-deep:#9c7a3e;
   --gold:#f6c945;--gold-dim:rgba(246,201,69,0.15);
   --gold-warm:#d4924a;
-  --green:#8ad6a4;--green-glow:rgba(138,214,164,0.3);
+  --green:#8ad6a4;
   --red:#e07c7c;--red-dim:rgba(224,124,124,0.12);
   --text:#f2efe8;--text-secondary:#98927f;--text-muted:#5c564a;
-  --text-primary:#ffffff;--text-on-gold:#1a1200;--text-on-green:#042414;
+  --text-primary:#ffffff;--text-on-gold:#1a1200;
   --today-ring:#7d9bff;
   --training-fill:rgba(212,175,106,0.32);
   --grad-gold:linear-gradient(135deg,var(--accent-bright) 0%,var(--accent) 45%,var(--accent-deep) 100%);
   --radius:12px;--radius-sm:8px;--radius-xs:6px;--radius-pill:999px;
-  --space-4:4px;--space-8:8px;--space-12:12px;--space-16:16px;--space-24:24px;--space-32:32px;--space-40:40px;
+  --space-4:4px;--space-8:8px;--space-12:12px;--space-16:16px;--space-24:24px;--space-40:40px;
   --text-size-xs:12px;--text-size-sm:14px;--text-size-md:16px;--text-size-lg:18px;--text-size-xl:24px;--text-size-2xl:32px;
-  --text-weight-regular:400;--text-weight-medium:500;--text-weight-semibold:600;--text-weight-bold:700;
-  --line-tight:1.1;--line-normal:1.5;--line-relaxed:1.6;
-  --shadow-sm:0 2px 8px rgba(0,0,0,0.3);--shadow-md:0 4px 20px rgba(0,0,0,0.4);--shadow-lg:0 20px 60px rgba(0,0,0,0.5);
-  --transition-fast:0.15s;--transition-base:0.2s;--transition-slow:0.3s;
+  --shadow-lg:0 20px 60px rgba(0,0,0,0.5);
+  --transition-fast:0.15s;
   --ease-out-expo:cubic-bezier(0.16,1,0.3,1);
   --ease-spring:cubic-bezier(0.34,1.56,0.64,1);
-  --dur-fast:0.18s;--dur-base:0.3s;--dur-slow:0.55s;
+  --dur-base:0.3s;
 }
 [data-theme="light"]{
   /* Ivory & Gold — light theme override */
@@ -35,10 +33,10 @@
   --accent-bright:#b08a45;--accent-deep:#6b5024;
   --gold:#b8860b;--gold-dim:rgba(184,134,11,0.12);
   --gold-warm:#c2701e;
-  --green:#1e7d46;--green-glow:rgba(30,125,70,0.2);
+  --green:#1e7d46;
   --red:#b91c1c;--red-dim:rgba(185,28,28,0.08);
   --text:#1c1812;--text-secondary:#6b6354;--text-muted:#a39a87;
-  --text-primary:#ffffff;--text-on-gold:#ffffff;--text-on-green:#ffffff;
+  --text-primary:#ffffff;--text-on-gold:#ffffff;
   --today-ring:#3b62d9;
   --training-fill:rgba(140,106,47,0.3);
   --grad-gold:linear-gradient(135deg,#c8a25c,#8c6a2f);
