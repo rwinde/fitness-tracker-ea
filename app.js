@@ -55,6 +55,28 @@ function localDateKey(d){
 const HTML_ESC={'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'};
 function escapeHtml(s){return String(s==null?'':s).replace(/[&<>"']/g,c=>HTML_ESC[c]);}
 
+// Inline SVG icons (Lucide-style) used by JS renderers. Static markup only —
+// NEVER interpolate user data into these strings.
+const ICON_ATTRS='class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"';
+const ICONS={
+  zap:`<svg ${ICON_ATTRS}><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>`,
+  trophy:`<svg ${ICON_ATTRS}><path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6"/><path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18"/><path d="M4 22h16"/><path d="M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22"/><path d="M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22"/><path d="M18 2H6v7a6 6 0 0 0 12 0V2Z"/></svg>`,
+  dumbbell:`<svg ${ICON_ATTRS}><path d="M14.4 14.4 9.6 9.6"/><path d="M18.657 21.485a2 2 0 1 1-2.829-2.828l-1.767 1.768a2 2 0 1 1-2.829-2.829l6.364-6.364a2 2 0 1 1 2.829 2.829l1.767-1.768a2 2 0 1 1 2.828 2.829z"/><path d="m21.5 21.5-1.4-1.4"/><path d="M3.9 3.9 2.5 2.5"/><path d="M6.404 12.768a2 2 0 1 1-2.829-2.829l1.768-1.767a2 2 0 1 1-2.828-2.829l2.828-2.828a2 2 0 1 1 2.829 2.828l1.767-1.768a2 2 0 1 1 2.829 2.829z"/></svg>`,
+  history:`<svg ${ICON_ATTRS}><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M12 7v5l4 2"/></svg>`,
+  target:`<svg ${ICON_ATTRS}><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></svg>`,
+  clipboardList:`<svg ${ICON_ATTRS}><rect width="8" height="4" x="8" y="2" rx="1" ry="1"/><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><path d="M12 11h4"/><path d="M12 16h4"/><path d="M8 11h.01"/><path d="M8 16h.01"/></svg>`,
+  calendar:`<svg ${ICON_ATTRS}><path d="M8 2v4"/><path d="M16 2v4"/><rect width="18" height="18" x="3" y="4" rx="2"/><path d="M3 10h18"/></svg>`,
+  check:`<svg ${ICON_ATTRS}><path d="M20 6 9 17l-5-5"/></svg>`,
+  checkCircle:`<svg ${ICON_ATTRS}><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><path d="m9 11 3 3L22 4"/></svg>`,
+  play:`<svg ${ICON_ATTRS}><polygon points="6 3 20 12 6 21 6 3"/></svg>`,
+  pencil:`<svg ${ICON_ATTRS}><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/><path d="m15 5 4 4"/></svg>`,
+  x:`<svg ${ICON_ATTRS}><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>`,
+  sun:`<svg ${ICON_ATTRS}><circle cx="12" cy="12" r="4"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="m4.93 4.93 1.41 1.41"/><path d="m17.66 17.66 1.41 1.41"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="m6.34 17.66-1.41 1.41"/><path d="m19.07 4.93-1.41 1.41"/></svg>`,
+  moon:`<svg ${ICON_ATTRS}><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/></svg>`,
+  gripVertical:`<svg ${ICON_ATTRS}><circle cx="9" cy="12" r="1"/><circle cx="9" cy="5" r="1"/><circle cx="9" cy="19" r="1"/><circle cx="15" cy="12" r="1"/><circle cx="15" cy="5" r="1"/><circle cx="15" cy="19" r="1"/></svg>`,
+  chevronDown:`<svg ${ICON_ATTRS}><path d="m6 9 6 6 6-6"/></svg>`,
+};
+
 let currentUser = null;
 let sessions = {};
 let templates = [];
@@ -88,7 +110,8 @@ window.toggleTheme = function() {
 function updateThemeToggleIcon() {
   const btn = document.getElementById('theme-toggle');
   if (!btn) return;
-  btn.textContent = document.documentElement.getAttribute('data-theme') === 'light' ? '☀️' : '🌙';
+  // Static ICONS markup only — safe for innerHTML
+  btn.innerHTML = document.documentElement.getAttribute('data-theme') === 'light' ? ICONS.sun : ICONS.moon;
 }
 function applyStoredTheme() {
   try {
@@ -347,10 +370,10 @@ function updateStats(){
   }
 }
 
-// Shared empty-state HTML — emoji + title + optional subtitle.
-function renderEmpty(emoji,title,sub){
+// Shared empty-state HTML — ICONS key + title + optional subtitle.
+function renderEmpty(icon,title,sub){
   return `<div class="empty-state">
-    <div class="empty-state-icon">${emoji}</div>
+    <div class="empty-state-icon">${ICONS[icon]||''}</div>
     <div class="empty-state-title">${title}</div>
     ${sub?`<div class="empty-state-sub">${sub}</div>`:''}
   </div>`;
@@ -404,12 +427,12 @@ function renderExerciseCard(ex,opts){
   card.className='exercise-card'+(hasPRClass?' has-pr':'');
   if(draggable){card.draggable=true;card.dataset.idx=idx;}
   if(flashAnimation)card.classList.add('pr-flash');
-  const dragHandle=draggable?`<span class="drag-handle" onmousedown="event.stopPropagation()" ontouchstart="event.stopPropagation()">⠿</span>`:'';
+  const dragHandle=draggable?`<span class="drag-handle" onmousedown="event.stopPropagation()" ontouchstart="event.stopPropagation()">${ICONS.gripVertical}</span>`:'';
   card.innerHTML=`
     <div class="exercise-header" onclick="${toggleFn}(${idx})">
       ${dragHandle}
       <div class="exercise-name">${escapeHtml(ex.name)}</div>${badgeHtml}
-      <span class="exercise-toggle${ex.open?' open':''}">▾</span>
+      <span class="exercise-toggle${ex.open?' open':''}">${ICONS.chevronDown}</span>
     </div>
     ${ex.open?`<div class="exercise-body">
       <table class="sets-table"><thead><tr><th>#</th><th>KG</th><th>Wdh</th><th>Vol</th></tr></thead><tbody>${setsRows}</tbody></table>
@@ -430,7 +453,7 @@ function render(){
     const todayBest=getTodayBest(ei);
     const isNewPR=todayBest&&(!pr||todayBest.kg>pr.kg||(todayBest.kg===pr.kg&&todayBest.reps>pr.reps));
     let badgeHtml;
-    if(isNewPR)badgeHtml=`<span class="pr-badge new-pr">🏆 Neuer PR!</span>`;
+    if(isNewPR)badgeHtml=`<span class="pr-badge new-pr">${ICONS.trophy} Neuer PR!</span>`;
     else if(pr)badgeHtml=`<span class="pr-badge has">PR: ${pr.kg}kg × ${pr.reps}</span>`;
     else badgeHtml=`<span class="pr-badge none">Kein PR</span>`;
     const card=renderExerciseCard(ex,{
@@ -460,7 +483,7 @@ function render(){
     list.appendChild(card);
   });
   if(!currentSession.exercises.length){
-    list.innerHTML=renderEmpty('💪','Bereit zum Training?','Füge deine erste Übung hinzu<br>und leg los.');
+    list.innerHTML=renderEmpty('dumbbell','Bereit zum Training?','Füge deine erste Übung hinzu<br>und leg los.');
   }
   updateStats();
 }
@@ -628,7 +651,7 @@ function renderHistory(){
     }
     return true;
   }).sort((a,b)=>b.localeCompare(a));
-  if(!keys.length){list.innerHTML=renderEmpty('🕘','Noch keine vergangenen Trainings','Trag heute dein erstes Training ein!');return;}
+  if(!keys.length){list.innerHTML=renderEmpty('history','Noch keine vergangenen Trainings','Trag heute dein erstes Training ein!');return;}
   list.innerHTML='';
   keys.forEach(key=>{
     const s=sessions[key];
@@ -685,7 +708,7 @@ function showDetail(key){
     const standing=standingPRs.get(exNameLower);
     const isExPR=!!(standing&&standing.dateKey===key);
     // Find the FIRST set that matches the standing PR + count total matches.
-    // Only the first match gets .pr-row; the 🏆 badge appears only when the
+    // Only the first match gets .pr-row; the trophy badge appears only when the
     // PR kg×reps was hit exactly once in this session (not repeated as
     // volume training).
     let firstMatchIndex=-1,matchCount=0;
@@ -702,7 +725,7 @@ function showDetail(key){
     const showExPRBadge=matchCount===1;
     const card=renderExerciseCard(ex,{
       readonly:true,
-      badgeHtml:showExPRBadge?`<span class="pr-badge new-pr">🏆 PR</span>`:'',
+      badgeHtml:showExPRBadge?`<span class="pr-badge new-pr">${ICONS.trophy} PR</span>`:'',
       hasPRClass:showExPRBadge,
       isPRSet:i=>i===firstMatchIndex,
     });
@@ -782,10 +805,10 @@ function renderGoals(){
   document.getElementById('goals-content').innerHTML=`
     <div class="week-goal-card">
       <div class="week-goal-header">
-        <div class="week-goal-icon">⚡</div>
+        <div class="week-goal-icon">${ICONS.zap}</div>
         <div class="week-goal-info">
           <div class="week-goal-title">Trainingstage diese Woche</div>
-          <div class="week-goal-sub">${done?'✓ Ziel erreicht!':((goal-trained)+' Tag'+(goal-trained===1?'':'e')+' noch nötig')}</div>
+          <div class="week-goal-sub">${done?ICONS.checkCircle+' Ziel erreicht!':((goal-trained)+' Tag'+(goal-trained===1?'':'e')+' noch nötig')}</div>
         </div>
         <div class="week-goal-count ${done?'done':trained>0?'progress':'zero'}">${trained}<span style="font-size:14px;color:var(--text-muted)">/${goal}</span></div>
       </div>
@@ -823,7 +846,7 @@ function renderWeekHistory(){
     if(Object.keys(sessions).some(k=>weekDays.includes(k))){result.push({monday,weekDays,trained});}
   }
   const goal=goals.trainDays||3;
-  if(!result.length){list.innerHTML=renderEmpty('🎯','Noch keine Daten','aus vergangenen Wochen.');return;}
+  if(!result.length){list.innerHTML=renderEmpty('target','Noch keine Daten','aus vergangenen Wochen.');return;}
   list.innerHTML=result.map(({monday,weekDays,trained})=>{
     const label=monday.getDate()+'.'+(monday.getMonth()+1)+'.';
     const dots=weekDays.map((k,i)=>{const t=sessions[k]&&sessions[k].exercises&&sessions[k].exercises.length>0;return `<div class="week-dot${t?' trained':''}">${DAYS[i]}</div>`;}).join('');
@@ -862,7 +885,7 @@ async function syncTemplatesWithBests(){
 
 function renderTemplates(){
   const list=document.getElementById('template-list');
-  if(!templates.length){list.innerHTML=renderEmpty('📋','Noch keine Vorlagen','Erstelle deine erste Vorlage!');return;}
+  if(!templates.length){list.innerHTML=renderEmpty('clipboardList','Noch keine Vorlagen','Erstelle deine erste Vorlage!');return;}
   list.innerHTML='';
   templates.forEach((tpl,ti)=>{
     const card=document.createElement('div');card.className='template-card';
@@ -874,9 +897,9 @@ function renderTemplates(){
       </div></div>
       <div class="template-ex-pills">${pills}</div>
       <div class="template-actions">
-        <button class="tpl-btn import" onclick="openImportModal(${ti})">▶ Import</button>
-        <button class="tpl-btn edit" onclick="openTemplateEditor(${ti})">✎ Edit</button>
-        <button class="tpl-btn del" onclick="deleteTemplate(${ti})">✕</button>
+        <button class="tpl-btn import" onclick="openImportModal(${ti})">${ICONS.play} Import</button>
+        <button class="tpl-btn edit" onclick="openTemplateEditor(${ti})">${ICONS.pencil} Edit</button>
+        <button class="tpl-btn del" onclick="deleteTemplate(${ti})">${ICONS.x}</button>
       </div>`;
     list.appendChild(card);
   });
@@ -903,7 +926,7 @@ function renderTplExList(){
         </div>
       </div>`).join('');
     div.innerHTML=`
-      <div class="tpl-ex-row-header"><div class="tpl-ex-row-name">${escapeHtml(ex.name)}</div><button class="tpl-ex-remove" onclick="removeTplEx(${ei})">✕</button></div>
+      <div class="tpl-ex-row-header"><div class="tpl-ex-row-name">${escapeHtml(ex.name)}</div><button class="tpl-ex-remove" onclick="removeTplEx(${ei})">${ICONS.x}</button></div>
       <div class="tpl-sets-grid">${setsHtml}</div>
       <button class="tpl-add-set" onclick="addTplSet(${ei})">+ Satz</button>`;
     list.appendChild(div);
@@ -1055,7 +1078,7 @@ function renderBacklogExercises(){
     list.appendChild(card);
   });
   if(!backlogSession.exercises.length){
-    list.innerHTML=renderEmpty('📅','Training hinzufügen','Füge Übungen für dieses<br>vergangene Training hinzu.');
+    list.innerHTML=renderEmpty('calendar','Training hinzufügen','Füge Übungen für dieses<br>vergangene Training hinzu.');
   }
 }
 
@@ -1239,7 +1262,7 @@ function renderHeatmapMonth(year,month,container,prDays,todayKey){
     }else{
       cell.textContent=day;
     }
-    const prSuffix=hasPR&&prNames&&prNames.length?' · 🏆 PR ('+prNames.join(', ')+')':'';
+    const prSuffix=hasPR&&prNames&&prNames.length?' · PR ('+prNames.join(', ')+')':'';
     cell.title=day+'. '+months[month]+' '+year+(exCount?' — '+exCount+' Übungen'+prSuffix:' — kein Training');
     if(hasPR||exCount>0){
       cell.addEventListener('click',()=>showDetail(key));
@@ -1290,7 +1313,7 @@ function renderHeatmapYear(year,container,prDays,todayKey){
       if(isToday)cellClass+=' today';
       const cell=document.createElement('div');
       cell.className=cellClass;
-      cell.title=day+'. '+months[m]+' '+year+(exCount?' — '+exCount+' Übungen'+(hasPR?' · 🏆 PR':''):'');
+      cell.title=day+'. '+months[m]+' '+year+(exCount?' — '+exCount+' Übungen'+(hasPR?' · PR':''):'');
       monthGrid.appendChild(cell);
     }
     monthWrap.appendChild(monthGrid);
