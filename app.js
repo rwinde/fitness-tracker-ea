@@ -416,11 +416,8 @@ function updateStats(){
   const fb=document.getElementById('finish-btn');
   if(fb){
     const hasExercises=currentSession.exercises.length>0;
-    const wasDisabled=fb.disabled;
     fb.disabled=!hasExercises;
     fb.classList.toggle('disabled',!hasExercises);
-    // One-shot sheen the moment the button becomes available
-    if(wasDisabled&&hasExercises&&!REDUCED_MOTION){fb.classList.remove('sheen');void fb.offsetWidth;fb.classList.add('sheen');}
   }
 }
 
