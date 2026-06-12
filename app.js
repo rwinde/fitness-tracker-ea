@@ -76,6 +76,10 @@ window.toggleTheme = function() {
   else root.removeAttribute('data-theme');
   try { localStorage.setItem('theme', goingLight ? 'light' : 'dark'); } catch(e) {}
   updateThemeToggleIcon();
+  // The canvas chart reads its colors from CSS variables at draw time,
+  // so it must be redrawn when the theme changes while it is visible.
+  const progressPage = document.getElementById('page-progress');
+  if (progressPage && progressPage.classList.contains('active') && window.renderProgressChart) window.renderProgressChart();
 };
 function updateThemeToggleIcon() {
   const btn = document.getElementById('theme-toggle');
@@ -139,8 +143,10 @@ async function loadAllData() {
   }
 }
 
+// Returns true on success, false on failure — errors are handled here so
+// callers (scheduleSave, finishTraining) never see a rejection.
 async function saveSession() {
-  if(!currentUser) return;
+  if(!currentUser) return false;
   setSyncStatus('syncing', '↑ Wird gespeichert…');
   const key=getTodayKey();
   try {
@@ -148,11 +154,13 @@ async function saveSession() {
     sessions[key] = JSON.parse(JSON.stringify(currentSession));
     setSyncStatus('synced', '✓ Gespeichert');
     setTimeout(() => setSyncStatus('', 'Bereit'), 1500);
+    return true;
   } catch(e) {
     console.error('saveSession failed', e);
     setSyncStatus('error', '✗ Speichern fehlgeschlagen');
     // Reset to neutral after a moment so the user can retry; the error is logged
     setTimeout(() => setSyncStatus('', 'Bereit'), 3000);
+    return false;
   }
 }
 
@@ -494,21 +502,17 @@ window.removeEx = function(ei){currentSession.exercises.splice(ei,1);scheduleSav
 // ── FINISH TRAINING ──
 window.finishTraining = async function(){
   if(!currentSession.exercises.length)return;
-  try{
-    // Force immediate save
-    if(saveTimer)clearTimeout(saveTimer);
-    await saveSession();
-    setSyncStatus('synced','✓ Training gespeichert!');
-    setTimeout(()=>setSyncStatus('','Bereit'),3000);
-    // Collapse all exercises
-    currentSession.exercises.forEach(ex=>ex.open=false);
-    render();
-    window.scrollTo({top:0,behavior:'smooth'});
-  }catch(e){
-    console.error('finishTraining failed', e);
-    setSyncStatus('error','✗ Speichern fehlgeschlagen');
-    setTimeout(()=>setSyncStatus('','Bereit'),3000);
-  }
+  // Force immediate save
+  if(saveTimer)clearTimeout(saveTimer);
+  // saveSession never throws — it reports failure via return value and has
+  // already set the error sync status, so just stop here on failure.
+  if(!await saveSession())return;
+  setSyncStatus('synced','✓ Training gespeichert!');
+  setTimeout(()=>setSyncStatus('','Bereit'),3000);
+  // Collapse all exercises
+  currentSession.exercises.forEach(ex=>ex.open=false);
+  render();
+  window.scrollTo({top:0,behavior:'smooth'});
 };
 
 // ── SHARED MODAL HELPERS ──
@@ -1271,11 +1275,20 @@ function populateExSelect(){
   if(prev&&exNames.has(prev))sel.value=prev;
 }
 
+// Chart colors come from the CSS custom properties so the canvas follows
+// the active theme (light/dark) instead of hardcoded dark-theme hex values.
+function getChartColors(){
+  const cs=getComputedStyle(document.documentElement);
+  const v=name=>cs.getPropertyValue(name).trim();
+  return {grid:v('--border'),text:v('--text-muted'),line:v('--accent'),fillTop:v('--accent-glow'),last:v('--gold')};
+}
+
 window.renderProgressChart = function(){
   const canvas=document.getElementById('progress-chart');
   const ctx=canvas.getContext('2d');
   const name=document.getElementById('progress-ex-select').value;
   const emptyMsg=document.getElementById('progress-empty');
+  const col=getChartColors();
   const dpr=window.devicePixelRatio||1;
   canvas.width=canvas.offsetWidth*dpr;
   canvas.height=canvas.offsetHeight*dpr;
@@ -1300,7 +1313,7 @@ window.renderProgressChart = function(){
   });
 
   if(points.length<2){
-    ctx.fillStyle='#5a5a70';ctx.font='13px DM Sans';
+    ctx.fillStyle=col.text;ctx.font='13px DM Sans';
     ctx.textAlign='center';ctx.fillText('Mindestens 2 Einträge nötig',W/2,H/2);
     return;
   }
@@ -1312,13 +1325,13 @@ window.renderProgressChart = function(){
   const rangeKg=maxKg-minKg||1;
 
   // Grid lines
-  ctx.strokeStyle='#2a2a36';ctx.lineWidth=1;
+  ctx.strokeStyle=col.grid;ctx.lineWidth=1;
   const gridSteps=4;
   for(let i=0;i<=gridSteps;i++){
     const y=pad.top+cH-(cH/gridSteps)*i;
     ctx.beginPath();ctx.moveTo(pad.left,y);ctx.lineTo(W-pad.right,y);ctx.stroke();
     const val=Math.round(minKg+(rangeKg/gridSteps)*i);
-    ctx.fillStyle='#5a5a70';ctx.font='11px Space Grotesk';ctx.textAlign='right';
+    ctx.fillStyle=col.text;ctx.font='11px Space Grotesk';ctx.textAlign='right';
     ctx.fillText(val+'kg',pad.left-8,y+4);
   }
 
@@ -1328,7 +1341,7 @@ window.renderProgressChart = function(){
   for(let i=0;i<points.length;i+=step){
     const x=pad.left+(cW/(points.length-1))*i;
     const d=points[i].date.slice(5).replace('-','.');
-    ctx.fillStyle='#5a5a70';ctx.font='10px Space Grotesk';ctx.textAlign='center';
+    ctx.fillStyle=col.text;ctx.font='10px Space Grotesk';ctx.textAlign='center';
     ctx.fillText(d,x,H-8);
   }
 
@@ -1343,8 +1356,8 @@ window.renderProgressChart = function(){
   ctx.lineTo(pad.left,pad.top+cH);
   ctx.closePath();
   const grad=ctx.createLinearGradient(0,pad.top,0,pad.top+cH);
-  grad.addColorStop(0,'rgba(108,92,231,0.3)');
-  grad.addColorStop(1,'rgba(108,92,231,0)');
+  grad.addColorStop(0,col.fillTop);
+  grad.addColorStop(1,'transparent');
   ctx.fillStyle=grad;ctx.fill();
 
   // Line
@@ -1354,22 +1367,23 @@ window.renderProgressChart = function(){
     const y=pad.top+cH-((p.kg-minKg)/rangeKg)*cH;
     if(i===0)ctx.moveTo(x,y);else ctx.lineTo(x,y);
   });
-  ctx.strokeStyle='#6c5ce7';ctx.lineWidth=2.5;ctx.lineJoin='round';ctx.stroke();
+  ctx.strokeStyle=col.line;ctx.lineWidth=2.5;ctx.lineJoin='round';ctx.stroke();
 
-  // Dots
+  // Dots — the most recent entry is highlighted in gold
   points.forEach((p,i)=>{
     const x=pad.left+(cW/(points.length-1))*i;
     const y=pad.top+cH-((p.kg-minKg)/rangeKg)*cH;
+    const dotColor=i===points.length-1?col.last:col.line;
     ctx.beginPath();ctx.arc(x,y,4,0,Math.PI*2);
-    ctx.fillStyle=i===points.length-1?'#f0c040':'#6c5ce7';ctx.fill();
-    ctx.strokeStyle=i===points.length-1?'#f0c040':'#6c5ce7';ctx.lineWidth=2;ctx.stroke();
+    ctx.fillStyle=dotColor;ctx.fill();
+    ctx.strokeStyle=dotColor;ctx.lineWidth=2;ctx.stroke();
   });
 }
 
 // ── KEYBOARD HANDLING ──
+// Shrink open modals when the on-screen keyboard reduces the visual viewport.
 if(window.visualViewport){
   window.visualViewport.addEventListener('resize',()=>{
-    const kbHeight=window.innerHeight-window.visualViewport.height;
     document.querySelectorAll('.modal-overlay.open .modal').forEach(m=>{
       m.style.maxHeight=Math.floor(window.visualViewport.height*0.82)+'px';
     });
