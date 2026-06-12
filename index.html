@@ -10,22 +10,14 @@
 <link rel="icon" type="image/png" href="icon.png">
 <link rel="apple-touch-icon" sizes="180x180" href="icon.png">
 <meta name="apple-mobile-web-app-title" content="Fitness">
-<link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="styles.css?v=v2.5.10">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="styles.css?v=v2.6.0">
 <script>
-var APP_VERSION='v2.5.10';
+var APP_VERSION='v2.6.0';
+// Legacy cleanup: unregister service workers from old app versions
 if('serviceWorker' in navigator){navigator.serviceWorker.getRegistrations().then(regs=>regs.forEach(r=>r.unregister()));}
-// Safari Private Mode and some embedded webviews throw on sessionStorage access.
-// Skipping the one-time cache-buster reload there is acceptable — worst case the user sees stale assets.
-(function(){
-  try{
-    var key='appV_'+APP_VERSION;
-    if(!sessionStorage.getItem(key)){
-      sessionStorage.setItem(key,'1');
-      location.replace(location.pathname+'?v='+APP_VERSION+'&t='+Date.now());
-    }
-  }catch(e){/* sessionStorage unavailable; skip the version reload */}
-})();
 // Detect standalone mode reliably on iOS
 if(window.navigator.standalone===true||window.matchMedia('(display-mode:standalone)').matches){
   document.documentElement.classList.add('standalone');
@@ -276,6 +268,6 @@ if(document.readyState==='loading'){
   </div>
 </div>
 
-<script type="module" src="app.js?v=v2.5.10"></script>
+<script type="module" src="app.js?v=v2.6.0"></script>
 </body>
 </html>

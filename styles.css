@@ -84,7 +84,6 @@ html.standalone .app{padding-top:calc(env(safe-area-inset-top,47px) + 60px);padd
 .btn--primary{background:var(--accent);border-color:var(--accent);color:var(--text-primary)}
 .btn--secondary{background:var(--surface2);border-color:var(--border);color:var(--text-secondary)}
 .btn--destructive{background:var(--red-dim);border-color:var(--red);color:var(--red)}
-.btn--ghost{background:transparent;border-color:transparent;color:var(--text-secondary)}
 .btn--warm{background:var(--gold-warm);border-color:var(--gold-warm);color:var(--text-on-gold);font-weight:700}
 /* Glass card base — shared by .card and the five matching variants */
 .card,.exercise-card,.session-card,.template-card,.week-goal-card,.chart-card{background:rgba(255,255,255,0.03);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);border:1px solid rgba(255,255,255,0.06);border-radius:var(--radius);position:relative}
@@ -127,7 +126,6 @@ html.standalone .app{padding-top:calc(env(safe-area-inset-top,47px) + 60px);padd
 .hero-divider{width:28px;height:2px;background:var(--accent);margin:5px 0;border-radius:1px}
 .hero-date{font-family:'Space Grotesk',sans-serif;font-size:34px;font-weight:700;color:var(--accent);line-height:1}
 .hero-month{font-size:15px;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.08em;margin:3px 0}
-.hero-user{font-size:var(--text-size-sm);color:var(--text-muted);display:flex;align-items:center;gap:var(--space-8);flex-wrap:wrap;margin:3px 0}
 .login-hero{width:140px;height:180px;border-radius:var(--radius);overflow:hidden;margin-bottom:var(--space-24);border:1px solid var(--border)}
 .login-hero img{width:100%;height:100%;object-fit:cover;object-position:center top}
 /* SYNC */
@@ -227,7 +225,6 @@ html.standalone .app{padding-top:calc(env(safe-area-inset-top,47px) + 60px);padd
 .detail-ex-vol{font-size:var(--text-size-md);color:var(--text-secondary);margin-top:10px;padding-top:10px;border-top:1px solid var(--border)}
 .detail-ex-vol span{color:var(--accent);font-family:'Space Grotesk',sans-serif;font-weight:700}
 .detail-notes{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:var(--space-16) 18px;font-size:var(--text-size-md);color:var(--text-secondary);line-height:1.6}
-.history-empty{text-align:center;color:var(--text-muted);font-size:var(--text-size-md);padding:var(--space-40) 20px}
 /* TEMPLATES */
 .template-card{margin-bottom:10px;overflow:hidden}
 .template-header{padding:14px var(--space-16);display:flex;align-items:center;gap:10px}
@@ -241,7 +238,6 @@ html.standalone .app{padding-top:calc(env(safe-area-inset-top,47px) + 60px);padd
 .tpl-btn.del{background:transparent;border-color:var(--border);color:var(--text-muted)}
 .template-ex-pills{padding:0 var(--space-16) 10px;display:flex;flex-wrap:wrap;gap:6px}
 .tpl-pill{font-size:var(--text-size-sm);background:var(--accent-dim);border:1px solid rgba(108,92,231,0.25);border-radius:var(--radius-pill);padding:3px 10px;color:var(--accent);font-weight:500}
-.templates-empty{text-align:center;color:var(--text-muted);font-size:var(--text-size-sm);padding:var(--space-40) 20px}
 /* GOALS */
 .week-goal-card{margin-bottom:var(--space-12);overflow:hidden}
 .week-goal-header{padding:var(--space-16);display:flex;align-items:center;gap:var(--space-12)}
@@ -280,7 +276,6 @@ html.standalone .app{padding-top:calc(env(safe-area-inset-top,47px) + 60px);padd
 .week-row-result{font-family:'Space Grotesk',sans-serif;font-size:var(--text-size-sm);font-weight:700;min-width:36px;text-align:right}
 .week-row-result.hit{color:var(--gold)}
 .week-row-result.miss{color:var(--text-muted)}
-.goals-empty{text-align:center;color:var(--text-muted);font-size:var(--text-size-sm);padding:30px 20px}
 /* PROGRESS TAB */
 .chart-card{padding:var(--space-16);margin-bottom:var(--space-12)}
 .chart-title{font-family:'Space Grotesk',sans-serif;font-size:var(--text-size-md);font-weight:600;color:var(--text);margin-bottom:var(--space-4)}

@@ -1,6 +1,6 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
 import { getAuth, GoogleAuthProvider, signInWithPopup, onAuthStateChanged, signOut as fbSignOut } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
-import { getFirestore, doc, getDoc, setDoc, deleteDoc, collection, getDocs } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+import { initializeFirestore, persistentLocalCache, persistentMultipleTabManager, doc, getDoc, setDoc, deleteDoc, collection, getDocs } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 
 const firebaseConfig = {
   apiKey: "AIzaSyDb7vt_KFwn0Bw0szJ6wfFWoW_rvCdHjkA",
@@ -13,7 +13,11 @@ const firebaseConfig = {
 
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
-const db = getFirestore(app);
+// Persistent offline cache (IndexedDB): the app keeps working without
+// network (e.g. in the gym) and repeated reads don't hit Firestore again.
+const db = initializeFirestore(app, {
+  localCache: persistentLocalCache({tabManager: persistentMultipleTabManager()})
+});
 const provider = new GoogleAuthProvider();
 
 
@@ -76,6 +80,10 @@ window.toggleTheme = function() {
   else root.removeAttribute('data-theme');
   try { localStorage.setItem('theme', goingLight ? 'light' : 'dark'); } catch(e) {}
   updateThemeToggleIcon();
+  // The canvas chart reads its colors from CSS variables at draw time,
+  // so it must be redrawn when the theme changes while it is visible.
+  const progressPage = document.getElementById('page-progress');
+  if (progressPage && progressPage.classList.contains('active') && window.renderProgressChart) window.renderProgressChart();
 };
 function updateThemeToggleIcon() {
   const btn = document.getElementById('theme-toggle');
@@ -120,16 +128,21 @@ function setSyncStatus(status, msg) {
 async function loadAllData() {
   setSyncStatus('syncing', '↑↓ Wird synchronisiert…');
   try {
-    const sessSnap = await getDocs(collection(db, 'users', currentUser.uid, 'sessions'));
+    const uid = currentUser.uid;
+    // The four reads are independent — fetch them in parallel
+    const [sessSnap, tplSnap, custSnap, goalsSnap] = await Promise.all([
+      getDocs(collection(db, 'users', uid, 'sessions')),
+      getDoc(doc(db, 'users', uid, 'data', 'templates')),
+      getDoc(doc(db, 'users', uid, 'data', 'custom')),
+      getDoc(doc(db, 'users', uid, 'data', 'goals')),
+    ]);
     sessions = {};
     sessSnap.forEach(d => { sessions[d.id] = d.data(); });
-    currentSession = sessions[getTodayKey()] ? JSON.parse(JSON.stringify(sessions[getTodayKey()])) : {exercises:[], notes:''};
+    invalidatePRCache();
+    currentSession = sessions[getTodayKey()] ? structuredClone(sessions[getTodayKey()]) : {exercises:[], notes:''};
     document.getElementById('notes').value = currentSession.notes || '';
-    const tplSnap = await getDoc(doc(db, 'users', currentUser.uid, 'data', 'templates'));
     templates = tplSnap.exists() ? (tplSnap.data().list || []) : [];
-    const custSnap = await getDoc(doc(db, 'users', currentUser.uid, 'data', 'custom'));
     customExercises = custSnap.exists() ? (custSnap.data().list || []) : [];
-    const goalsSnap = await getDoc(doc(db, 'users', currentUser.uid, 'data', 'goals'));
     goals = goalsSnap.exists() ? goalsSnap.data() : {trainDays: 3};
     setSyncStatus('synced', '✓ Synchronisiert');
     setTimeout(() => setSyncStatus('', 'Bereit'), 2000);
@@ -139,20 +152,25 @@ async function loadAllData() {
   }
 }
 
+// Returns true on success, false on failure — errors are handled here so
+// callers (scheduleSave, finishTraining) never see a rejection.
 async function saveSession() {
-  if(!currentUser) return;
+  if(!currentUser) return false;
   setSyncStatus('syncing', '↑ Wird gespeichert…');
   const key=getTodayKey();
   try {
     await setDoc(doc(db, 'users', currentUser.uid, 'sessions', key), currentSession);
-    sessions[key] = JSON.parse(JSON.stringify(currentSession));
+    sessions[key] = structuredClone(currentSession);
+    invalidatePRCache();
     setSyncStatus('synced', '✓ Gespeichert');
     setTimeout(() => setSyncStatus('', 'Bereit'), 1500);
+    return true;
   } catch(e) {
     console.error('saveSession failed', e);
     setSyncStatus('error', '✗ Speichern fehlgeschlagen');
     // Reset to neutral after a moment so the user can retry; the error is logged
     setTimeout(() => setSyncStatus('', 'Bereit'), 3000);
+    return false;
   }
 }
 
@@ -269,18 +287,33 @@ async function ensureCustomExercise(rawName){
   return q;
 }
 
-function getExPR(name){
-  let best=null;
+// PR lookup cache. getExPR used to scan ALL sessions on every call — and it
+// is called per exercise on each render(), per option in the picker and on
+// every kg keystroke. The cache builds the map once per data state in a
+// single pass; sessions mutations must call invalidatePRCache().
+// Today is excluded (a PR is always measured against PAST sessions), so the
+// cache also tracks which day it was built for and rebuilds after midnight.
+let prCache=null, prCacheDay=null;
+function invalidatePRCache(){prCache=null;}
+function buildPRCache(todayKey){
+  const map=new Map(); // exact exercise name -> {kg, reps}
   Object.entries(sessions).forEach(([k,s])=>{
-    if(k===getTodayKey())return;
+    if(k===todayKey)return;
     (s.exercises||[]).forEach(ex=>{
-      if(ex.name===name)ex.sets.forEach(set=>{
+      let best=map.get(ex.name)||null;
+      ex.sets.forEach(set=>{
         const kg=parseFloat(set.kg)||0,reps=parseFloat(set.reps)||0;
         if(kg>0&&(!best||kg>best.kg||(kg===best.kg&&reps>best.reps)))best={kg,reps};
       });
+      if(best)map.set(ex.name,best);
     });
   });
-  return best;
+  return map;
+}
+function getExPR(name){
+  const today=getTodayKey();
+  if(!prCache||prCacheDay!==today){prCache=buildPRCache(today);prCacheDay=today;}
+  return prCache.get(name)||null;
 }
 
 function getTodayBest(ei){
@@ -494,21 +527,17 @@ window.removeEx = function(ei){currentSession.exercises.splice(ei,1);scheduleSav
 // ── FINISH TRAINING ──
 window.finishTraining = async function(){
   if(!currentSession.exercises.length)return;
-  try{
-    // Force immediate save
-    if(saveTimer)clearTimeout(saveTimer);
-    await saveSession();
-    setSyncStatus('synced','✓ Training gespeichert!');
-    setTimeout(()=>setSyncStatus('','Bereit'),3000);
-    // Collapse all exercises
-    currentSession.exercises.forEach(ex=>ex.open=false);
-    render();
-    window.scrollTo({top:0,behavior:'smooth'});
-  }catch(e){
-    console.error('finishTraining failed', e);
-    setSyncStatus('error','✗ Speichern fehlgeschlagen');
-    setTimeout(()=>setSyncStatus('','Bereit'),3000);
-  }
+  // Force immediate save
+  if(saveTimer)clearTimeout(saveTimer);
+  // saveSession never throws — it reports failure via return value and has
+  // already set the error sync status, so just stop here on failure.
+  if(!await saveSession())return;
+  setSyncStatus('synced','✓ Training gespeichert!');
+  setTimeout(()=>setSyncStatus('','Bereit'),3000);
+  // Collapse all exercises
+  currentSession.exercises.forEach(ex=>ex.open=false);
+  render();
+  window.scrollTo({top:0,behavior:'smooth'});
 };
 
 // ── SHARED MODAL HELPERS ──
@@ -524,33 +553,57 @@ window.openExerciseModal = function(){
   filterExercises();
   setTimeout(()=>document.getElementById('search').focus(),300);
 };
-window.filterExercises = function(){
-  const q=document.getElementById('search').value.trim(),ql=q.toLowerCase();
+// Shared filter for the three exercise-picker modals (today / template /
+// backlog). They only differ in element ids, whether the muscle group is
+// searchable, and which extras (PR line, "eigene"-badge) are shown.
+// cfg: {searchId, btnId, optionsId, matchMuscle, showPR, showCustomBadge, emptyText}
+function filterExercisePicker(cfg){
+  const q=document.getElementById(cfg.searchId).value.trim(),ql=q.toLowerCase();
   const all=allExercises();
-  const filtered=q?all.filter(e=>e.name.toLowerCase().includes(ql)||e.muscle.toLowerCase().includes(ql)):all;
+  const filtered=q?all.filter(e=>e.name.toLowerCase().includes(ql)||(cfg.matchMuscle&&e.muscle.toLowerCase().includes(ql))):all;
   const exactMatch=all.some(e=>e.name.toLowerCase()===ql);
-  const btn=document.getElementById('custom-btn');
+  const btn=document.getElementById(cfg.btnId);
   if(q&&!exactMatch){btn.textContent=`"${q}" neu`;btn.classList.add('visible');}
   else btn.classList.remove('visible');
-  const opts=document.getElementById('exercise-options');
-  if(!filtered.length){opts.innerHTML=`<div class="no-results">Keine Übung gefunden — oben als neue hinzufügen.</div>`;return;}
+  const opts=document.getElementById(cfg.optionsId);
+  if(!filtered.length){opts.innerHTML=`<div class="no-results">${cfg.emptyText}</div>`;return;}
   const grouped={};
   filtered.forEach(e=>{if(!grouped[e.muscle])grouped[e.muscle]=[];grouped[e.muscle].push(e);});
+  const showLabels=Object.keys(grouped).length>1;
   let html='';
   Object.entries(grouped).forEach(([muscle,exs])=>{
-    if(Object.keys(grouped).length>1)html+=`<div class="muscle-label">${muscle}</div>`;
+    if(showLabels)html+=`<div class="muscle-label">${muscle}</div>`;
     exs.forEach(e=>{
-      const pr=getExPR(e.name);
-      const isCustom=e.muscle==='Eigene';
-      const prText=pr?`PR: <span>${pr.kg}kg × ${pr.reps} Wdh</span>`:`<span style="color:var(--text-muted)">Noch kein Eintrag</span>`;
+      const isCustom=cfg.showCustomBadge&&e.muscle==='Eigene';
+      const badge=isCustom?' <span style="font-size:10px;color:var(--accent)">✓ eigene</span>':'';
+      let prHtml='';
+      if(cfg.showPR){
+        const pr=getExPR(e.name);
+        const prText=pr?`PR: <span>${pr.kg}kg × ${pr.reps} Wdh</span>`:`<span style="color:var(--text-muted)">Noch kein Eintrag</span>`;
+        prHtml=`<div class="exercise-option-pr">${prText}</div>`;
+      }
       html+=`<div class="exercise-option${isCustom?' custom':''}" data-name="${escapeHtml(e.name)}">
-        <div class="exercise-option-name">${escapeHtml(e.name)}${isCustom?' <span style="font-size:10px;color:var(--accent)">✓ eigene</span>':''}</div>
-        <div class="exercise-option-pr">${prText}</div>
+        <div class="exercise-option-name">${escapeHtml(e.name)}${badge}</div>${prHtml}
       </div>`;
     });
   });
   opts.innerHTML=html;
-};
+}
+window.filterExercises = ()=>filterExercisePicker({
+  searchId:'search',btnId:'custom-btn',optionsId:'exercise-options',
+  matchMuscle:true,showPR:true,showCustomBadge:true,
+  emptyText:'Keine Übung gefunden — oben als neue hinzufügen.',
+});
+window.filterTplExercises = ()=>filterExercisePicker({
+  searchId:'tpl-search',btnId:'tpl-custom-btn',optionsId:'tpl-exercise-options',
+  matchMuscle:false,showPR:false,showCustomBadge:false,
+  emptyText:'Keine Übung gefunden.',
+});
+window.filterBacklogExercises = ()=>filterExercisePicker({
+  searchId:'backlog-search',btnId:'backlog-custom-btn',optionsId:'backlog-exercise-options',
+  matchMuscle:true,showPR:false,showCustomBadge:true,
+  emptyText:'Keine Übung gefunden — oben als neue hinzufügen.',
+});
 window.addCustomExercise = async function(){
   const name=await ensureCustomExercise(document.getElementById('search').value);
   if(!name)return;
@@ -660,7 +713,7 @@ window.editSession = function(){
   if(!currentDetailKey||!sessions[currentDetailKey])return;
   backlogKey=currentDetailKey;
   backlogOriginalKey=currentDetailKey; // remember original date for potential date change
-  backlogSession=JSON.parse(JSON.stringify(sessions[currentDetailKey]));
+  backlogSession=structuredClone(sessions[currentDetailKey]);
   backlogSession.exercises.forEach(ex=>ex.open=true);
   const d=new Date(currentDetailKey+'T12:00:00');
   const dayIdx=(d.getDay()+6)%7;
@@ -681,6 +734,7 @@ window.deleteSession = async function(){
   try{
     await deleteDoc(doc(db,'users',currentUser.uid,'sessions',currentDetailKey));
     delete sessions[currentDetailKey];
+    invalidatePRCache();
     // If deleting today's session, reset currentSession too
     if(currentDetailKey===getTodayKey()){
       currentSession={exercises:[],notes:''};
@@ -716,11 +770,10 @@ function renderGoals(){
   const monday=getMondayOfWeek(today);const weekDays=getWeekDays(monday);
   const trained=countTrainedDays(weekDays);const goal=goals.trainDays||3;
   const pct=Math.min(100,Math.round((trained/goal)*100));const done=trained>=goal;
-  const dayNames=['Mo','Di','Mi','Do','Fr','Sa','So'];
   const weekDotsHtml=weekDays.map((k,i)=>{
     const t=sessions[k]&&sessions[k].exercises&&sessions[k].exercises.length>0;
     const isToday=k===getTodayKey();
-    return `<div style="flex:1;text-align:center"><div class="week-dot${t?' trained':''}${isToday?' today':''}" style="margin:0 auto;width:100%;max-width:38px">${dayNames[i]}</div></div>`;
+    return `<div style="flex:1;text-align:center"><div class="week-dot${t?' trained':''}${isToday?' today':''}" style="margin:0 auto;width:100%;max-width:38px">${DAYS[i]}</div></div>`;
   }).join('');
   document.getElementById('goals-content').innerHTML=`
     <div class="week-goal-card">
@@ -765,11 +818,11 @@ function renderWeekHistory(){
     const trained=countTrainedDays(weekDays);
     if(Object.keys(sessions).some(k=>weekDays.includes(k))){result.push({monday,weekDays,trained});}
   }
-  const goal=goals.trainDays||3;const dayNames=['Mo','Di','Mi','Do','Fr','Sa','So'];
+  const goal=goals.trainDays||3;
   if(!result.length){list.innerHTML=renderEmpty('🎯','Noch keine Daten','aus vergangenen Wochen.');return;}
   list.innerHTML=result.map(({monday,weekDays,trained})=>{
     const label=monday.getDate()+'.'+(monday.getMonth()+1)+'.';
-    const dots=weekDays.map((k,i)=>{const t=sessions[k]&&sessions[k].exercises&&sessions[k].exercises.length>0;return `<div class="week-dot${t?' trained':''}">${dayNames[i]}</div>`;}).join('');
+    const dots=weekDays.map((k,i)=>{const t=sessions[k]&&sessions[k].exercises&&sessions[k].exercises.length>0;return `<div class="week-dot${t?' trained':''}">${DAYS[i]}</div>`;}).join('');
     const hit=trained>=goal;
     return `<div class="week-row"><div class="week-row-label">Ab ${label}</div><div class="week-row-dots">${dots}</div><div class="week-row-result ${hit?'hit':'miss'}">${trained}/${goal}</div></div>`;
   }).join('');
@@ -803,7 +856,7 @@ window.deleteTemplate = async function(ti){
 };
 window.openTemplateEditor = function(ti){
   if(ti===null){editingTemplate={id:Date.now(),name:'',exercises:[]};document.getElementById('tpl-editor-title').textContent='Neue Vorlage';document.getElementById('tpl-name-input').value='';}
-  else{editingTemplate=JSON.parse(JSON.stringify(templates[ti]));editingTemplate._editIdx=ti;document.getElementById('tpl-editor-title').textContent='Vorlage bearbeiten';document.getElementById('tpl-name-input').value=editingTemplate.name;}
+  else{editingTemplate=structuredClone(templates[ti]);editingTemplate._editIdx=ti;document.getElementById('tpl-editor-title').textContent='Vorlage bearbeiten';document.getElementById('tpl-name-input').value=editingTemplate.name;}
   renderTplExList();window.openModal('tpl-editor-overlay');
 };
 function renderTplExList(){
@@ -845,23 +898,6 @@ window.openTplExModal = function(){
   window.openModal('tpl-ex-modal-overlay');
   document.getElementById('tpl-search').value='';document.getElementById('tpl-custom-btn').classList.remove('visible');
   filterTplExercises();setTimeout(()=>document.getElementById('tpl-search').focus(),300);
-};
-window.filterTplExercises = function(){
-  const q=document.getElementById('tpl-search').value.trim(),ql=q.toLowerCase();
-  const all=allExercises();const filtered=q?all.filter(e=>e.name.toLowerCase().includes(ql)):all;
-  const exactMatch=all.some(e=>e.name.toLowerCase()===ql);
-  const btn=document.getElementById('tpl-custom-btn');
-  if(q&&!exactMatch){btn.textContent=`"${q}" neu`;btn.classList.add('visible');}
-  else btn.classList.remove('visible');
-  const opts=document.getElementById('tpl-exercise-options');
-  if(!filtered.length){opts.innerHTML=`<div class="no-results">Keine Übung gefunden.</div>`;return;}
-  const grouped={};filtered.forEach(e=>{if(!grouped[e.muscle])grouped[e.muscle]=[];grouped[e.muscle].push(e);});
-  let html='';
-  Object.entries(grouped).forEach(([muscle,exs])=>{
-    if(Object.keys(grouped).length>1)html+=`<div class="muscle-label">${muscle}</div>`;
-    exs.forEach(e=>{html+=`<div class="exercise-option" data-name="${escapeHtml(e.name)}"><div class="exercise-option-name">${escapeHtml(e.name)}</div></div>`;});
-  });
-  opts.innerHTML=html;
 };
 window.addTplCustomExercise = async function(){
   const name=await ensureCustomExercise(document.getElementById('tpl-search').value);
@@ -905,7 +941,7 @@ window.confirmBacklogDate = function(){
   backlogKey = dateStr;
   // Track an existing entry so a later date change deletes the original instead of duplicating it
   backlogOriginalKey = sessions[dateStr] ? dateStr : null;
-  backlogSession = sessions[dateStr] ? JSON.parse(JSON.stringify(sessions[dateStr])) : {exercises:[], notes:''};
+  backlogSession = sessions[dateStr] ? structuredClone(sessions[dateStr]) : {exercises:[], notes:''};
   const d=new Date(dateStr+'T12:00:00');
   const dayIdx=(d.getDay()+6)%7;
   document.getElementById('backlog-date-label').textContent=DAYS_FULL[dayIdx]+', '+d.getDate()+'. '+monthsFull[d.getMonth()]+' '+d.getFullYear();
@@ -956,10 +992,11 @@ window.saveBacklog = async function(){
       }
     }
     await setDoc(doc(db,'users',currentUser.uid,'sessions',backlogKey),backlogSession);
-    sessions[backlogKey]=JSON.parse(JSON.stringify(backlogSession));
+    sessions[backlogKey]=structuredClone(backlogSession);
+    invalidatePRCache();
     // If saving to today, update currentSession too
     if(backlogKey===getTodayKey()){
-      currentSession=JSON.parse(JSON.stringify(backlogSession));
+      currentSession=structuredClone(backlogSession);
       document.getElementById('notes').value=currentSession.notes||'';
     }
     setSyncStatus('synced','✓ Gespeichert');
@@ -1006,30 +1043,6 @@ window.openBacklogExModal=function(){
   document.getElementById('backlog-custom-btn').classList.remove('visible');
   filterBacklogExercises();
   setTimeout(()=>document.getElementById('backlog-search').focus(),300);
-};
-window.filterBacklogExercises=function(){
-  const q=document.getElementById('backlog-search').value.trim(),ql=q.toLowerCase();
-  const all=allExercises();
-  const filtered=q?all.filter(e=>e.name.toLowerCase().includes(ql)||e.muscle.toLowerCase().includes(ql)):all;
-  const exactMatch=all.some(e=>e.name.toLowerCase()===ql);
-  const btn=document.getElementById('backlog-custom-btn');
-  if(q&&!exactMatch){btn.textContent=`"${q}" neu`;btn.classList.add('visible');}
-  else btn.classList.remove('visible');
-  const opts=document.getElementById('backlog-exercise-options');
-  if(!filtered.length){opts.innerHTML=`<div class="no-results">Keine Übung gefunden — oben als neue hinzufügen.</div>`;return;}
-  const grouped={};
-  filtered.forEach(e=>{if(!grouped[e.muscle])grouped[e.muscle]=[];grouped[e.muscle].push(e);});
-  let html='';
-  Object.entries(grouped).forEach(([muscle,exs])=>{
-    if(Object.keys(grouped).length>1)html+=`<div class="muscle-label">${muscle}</div>`;
-    exs.forEach(e=>{
-      const isCustom=e.muscle==='Eigene';
-      html+=`<div class="exercise-option${isCustom?' custom':''}" data-name="${escapeHtml(e.name)}">
-        <div class="exercise-option-name">${escapeHtml(e.name)}${isCustom?' <span style="font-size:10px;color:var(--accent)">✓ eigene</span>':''}</div>
-      </div>`;
-    });
-  });
-  opts.innerHTML=html;
 };
 window.addBacklogCustomExercise=async function(){
   const name=await ensureCustomExercise(document.getElementById('backlog-search').value);
@@ -1271,11 +1284,20 @@ function populateExSelect(){
   if(prev&&exNames.has(prev))sel.value=prev;
 }
 
+// Chart colors come from the CSS custom properties so the canvas follows
+// the active theme (light/dark) instead of hardcoded dark-theme hex values.
+function getChartColors(){
+  const cs=getComputedStyle(document.documentElement);
+  const v=name=>cs.getPropertyValue(name).trim();
+  return {grid:v('--border'),text:v('--text-muted'),line:v('--accent'),fillTop:v('--accent-glow'),last:v('--gold')};
+}
+
 window.renderProgressChart = function(){
   const canvas=document.getElementById('progress-chart');
   const ctx=canvas.getContext('2d');
   const name=document.getElementById('progress-ex-select').value;
   const emptyMsg=document.getElementById('progress-empty');
+  const col=getChartColors();
   const dpr=window.devicePixelRatio||1;
   canvas.width=canvas.offsetWidth*dpr;
   canvas.height=canvas.offsetHeight*dpr;
@@ -1300,7 +1322,7 @@ window.renderProgressChart = function(){
   });
 
   if(points.length<2){
-    ctx.fillStyle='#5a5a70';ctx.font='13px DM Sans';
+    ctx.fillStyle=col.text;ctx.font='13px DM Sans';
     ctx.textAlign='center';ctx.fillText('Mindestens 2 Einträge nötig',W/2,H/2);
     return;
   }
@@ -1312,13 +1334,13 @@ window.renderProgressChart = function(){
   const rangeKg=maxKg-minKg||1;
 
   // Grid lines
-  ctx.strokeStyle='#2a2a36';ctx.lineWidth=1;
+  ctx.strokeStyle=col.grid;ctx.lineWidth=1;
   const gridSteps=4;
   for(let i=0;i<=gridSteps;i++){
     const y=pad.top+cH-(cH/gridSteps)*i;
     ctx.beginPath();ctx.moveTo(pad.left,y);ctx.lineTo(W-pad.right,y);ctx.stroke();
     const val=Math.round(minKg+(rangeKg/gridSteps)*i);
-    ctx.fillStyle='#5a5a70';ctx.font='11px Space Grotesk';ctx.textAlign='right';
+    ctx.fillStyle=col.text;ctx.font='11px Space Grotesk';ctx.textAlign='right';
     ctx.fillText(val+'kg',pad.left-8,y+4);
   }
 
@@ -1328,7 +1350,7 @@ window.renderProgressChart = function(){
   for(let i=0;i<points.length;i+=step){
     const x=pad.left+(cW/(points.length-1))*i;
     const d=points[i].date.slice(5).replace('-','.');
-    ctx.fillStyle='#5a5a70';ctx.font='10px Space Grotesk';ctx.textAlign='center';
+    ctx.fillStyle=col.text;ctx.font='10px Space Grotesk';ctx.textAlign='center';
     ctx.fillText(d,x,H-8);
   }
 
@@ -1343,8 +1365,8 @@ window.renderProgressChart = function(){
   ctx.lineTo(pad.left,pad.top+cH);
   ctx.closePath();
   const grad=ctx.createLinearGradient(0,pad.top,0,pad.top+cH);
-  grad.addColorStop(0,'rgba(108,92,231,0.3)');
-  grad.addColorStop(1,'rgba(108,92,231,0)');
+  grad.addColorStop(0,col.fillTop);
+  grad.addColorStop(1,'transparent');
   ctx.fillStyle=grad;ctx.fill();
 
   // Line
@@ -1354,22 +1376,23 @@ window.renderProgressChart = function(){
     const y=pad.top+cH-((p.kg-minKg)/rangeKg)*cH;
     if(i===0)ctx.moveTo(x,y);else ctx.lineTo(x,y);
   });
-  ctx.strokeStyle='#6c5ce7';ctx.lineWidth=2.5;ctx.lineJoin='round';ctx.stroke();
+  ctx.strokeStyle=col.line;ctx.lineWidth=2.5;ctx.lineJoin='round';ctx.stroke();
 
-  // Dots
+  // Dots — the most recent entry is highlighted in gold
   points.forEach((p,i)=>{
     const x=pad.left+(cW/(points.length-1))*i;
     const y=pad.top+cH-((p.kg-minKg)/rangeKg)*cH;
+    const dotColor=i===points.length-1?col.last:col.line;
     ctx.beginPath();ctx.arc(x,y,4,0,Math.PI*2);
-    ctx.fillStyle=i===points.length-1?'#f0c040':'#6c5ce7';ctx.fill();
-    ctx.strokeStyle=i===points.length-1?'#f0c040':'#6c5ce7';ctx.lineWidth=2;ctx.stroke();
+    ctx.fillStyle=dotColor;ctx.fill();
+    ctx.strokeStyle=dotColor;ctx.lineWidth=2;ctx.stroke();
   });
 }
 
 // ── KEYBOARD HANDLING ──
+// Shrink open modals when the on-screen keyboard reduces the visual viewport.
 if(window.visualViewport){
   window.visualViewport.addEventListener('resize',()=>{
-    const kbHeight=window.innerHeight-window.visualViewport.height;
     document.querySelectorAll('.modal-overlay.open .modal').forEach(m=>{
       m.style.maxHeight=Math.floor(window.visualViewport.height*0.82)+'px';
     });
