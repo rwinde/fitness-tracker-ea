@@ -75,7 +75,18 @@ const ICONS={
   moon:`<svg ${ICON_ATTRS}><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/></svg>`,
   gripVertical:`<svg ${ICON_ATTRS}><circle cx="9" cy="12" r="1"/><circle cx="9" cy="5" r="1"/><circle cx="9" cy="19" r="1"/><circle cx="15" cy="12" r="1"/><circle cx="15" cy="5" r="1"/><circle cx="15" cy="19" r="1"/></svg>`,
   chevronDown:`<svg ${ICON_ATTRS}><path d="m6 9 6 6 6-6"/></svg>`,
+  chevronLeft:`<svg ${ICON_ATTRS}><path d="m15 18-6-6 6-6"/></svg>`,
+  chevronRight:`<svg ${ICON_ATTRS}><path d="m9 18 6-6-6-6"/></svg>`,
+  arrowLeft:`<svg ${ICON_ATTRS}><path d="m12 19-7-7 7-7"/><path d="M19 12H5"/></svg>`,
+  trash:`<svg ${ICON_ATTRS}><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/><line x1="10" x2="10" y1="11" y2="17"/><line x1="14" x2="14" y1="11" y2="17"/></svg>`,
+  trendingUp:`<svg ${ICON_ATTRS}><polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/><polyline points="16 7 22 7 22 13"/></svg>`,
+  rotateCcw:`<svg ${ICON_ATTRS}><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>`,
+  plus:`<svg ${ICON_ATTRS}><path d="M5 12h14"/><path d="M12 5v14"/></svg>`,
 };
+// Hydrate static markup: index.html carries <span data-icon="…"> placeholders so
+// every SVG lives only here in the registry. Runs at module init — the app
+// chrome is display:none until auth resolves, so the swap is never visible.
+document.querySelectorAll('[data-icon]').forEach(el=>{el.outerHTML=ICONS[el.dataset.icon]||'';});
 
 // ── MOTION HELPERS ──
 const REDUCED_MOTION = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -83,11 +94,21 @@ const REDUCED_MOTION = window.matchMedia('(prefers-reduced-motion: reduce)').mat
 // mid-page re-renders (toggle / add / remove / stepper) never replay it.
 function staggerIn(containerId){
   if(REDUCED_MOTION)return;
-  document.querySelectorAll('#'+containerId+' > *').forEach((el,i)=>{
-    el.classList.remove('anim-in');void el.offsetWidth;
+  const els=document.querySelectorAll('#'+containerId+' > *');
+  if(!els.length)return;
+  els.forEach(el=>el.classList.remove('anim-in'));
+  void els[0].offsetWidth; // one forced reflow re-arms the animation for the whole list
+  els.forEach((el,i)=>{
     el.classList.add('anim-in');
     el.style.animationDelay=Math.min(i*55,440)+'ms';
   });
+}
+// Restart a one-shot animation class: remove → forced reflow → re-add
+function replayAnim(el,cls){el.classList.remove(cls);void el.offsetWidth;el.classList.add(cls);}
+// Entrance for a single appended card — the rest of the list stays still
+function popInLast(containerId){
+  const last=document.getElementById(containerId).lastElementChild;
+  if(last&&!REDUCED_MOTION)last.classList.add('anim-in');
 }
 // rAF count-up; data-val remembers the last value so unchanged stats render instantly
 function countUp(el,to,fmt){
@@ -139,7 +160,7 @@ function updateThemeToggleIcon() {
   if (!btn) return;
   // Static ICONS markup only — safe for innerHTML
   btn.innerHTML = document.documentElement.getAttribute('data-theme') === 'light' ? ICONS.sun : ICONS.moon;
-  btn.classList.remove('spin');void btn.offsetWidth;btn.classList.add('spin');
+  replayAnim(btn,'spin');
 }
 function applyStoredTheme() {
   try {
@@ -316,7 +337,7 @@ window.showPage = function(name) {
   if(name==='goals') renderGoals();
   if(name==='progress') renderProgress();
   if(!REDUCED_MOTION){
-    page.classList.remove('page-anim');void page.offsetWidth;page.classList.add('page-anim');
+    replayAnim(page,'page-anim');
     (PAGE_STAGGER[name]||[]).forEach(staggerIn);
   }
   window.scrollTo(0,0);
@@ -597,10 +618,7 @@ window.updateSet = function(ei,si,field,input){
         const hadPR=kgInput.classList.contains('pr-value');
         kgInput.className='set-input'+(isPR?' pr-value':'');
         // Gold burst the moment a set first crosses the PR threshold
-        if(isPR&&!hadPR&&!REDUCED_MOTION){
-          cards[ei].classList.remove('pr-burst');void cards[ei].offsetWidth;
-          cards[ei].classList.add('pr-burst');
-        }
+        if(isPR&&!hadPR&&!REDUCED_MOTION)replayAnim(cards[ei],'pr-burst');
       }
     }
   }
@@ -696,9 +714,7 @@ window.addCustomExercise = async function(){
 window.addExercise = function(name){
   currentSession.exercises.push({name,open:true,sets:[{kg:'',reps:''},{kg:'',reps:''},{kg:'',reps:''}]});
   scheduleSave();render();window.closeModal('modal-overlay');
-  // Pop only the new card — the rest of the list stays still
-  const last=document.getElementById('exercise-list').lastElementChild;
-  if(last&&!REDUCED_MOTION)last.classList.add('anim-in');
+  popInLast('exercise-list');
 };
 
 // ── HISTORY ──
@@ -1175,8 +1191,7 @@ window.addBacklogCustomExercise=async function(){
 window.addBacklogExercise=function(name){
   backlogSession.exercises.push({name,open:true,sets:[{kg:'',reps:''},{kg:'',reps:''},{kg:'',reps:''}]});
   window.closeModal('backlog-ex-modal-overlay');renderBacklogExercises();
-  const last=document.getElementById('backlog-exercise-list').lastElementChild;
-  if(last&&!REDUCED_MOTION)last.classList.add('anim-in');
+  popInLast('backlog-exercise-list');
 };
 
 // ── PROGRESS ──
