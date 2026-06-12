@@ -77,6 +77,33 @@ const ICONS={
   chevronDown:`<svg ${ICON_ATTRS}><path d="m6 9 6 6 6-6"/></svg>`,
 };
 
+// ── MOTION HELPERS ──
+const REDUCED_MOTION = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+// Staggered entrance for a list container. Called only from showPage/initUI so
+// mid-page re-renders (toggle / add / remove / stepper) never replay it.
+function staggerIn(containerId){
+  if(REDUCED_MOTION)return;
+  document.querySelectorAll('#'+containerId+' > *').forEach((el,i)=>{
+    el.classList.remove('anim-in');void el.offsetWidth;
+    el.classList.add('anim-in');
+    el.style.animationDelay=Math.min(i*55,440)+'ms';
+  });
+}
+// rAF count-up; data-val remembers the last value so unchanged stats render instantly
+function countUp(el,to,fmt){
+  fmt=fmt||String;
+  const from=parseFloat(el.dataset.val)||0;
+  el.dataset.val=to;
+  if(REDUCED_MOTION||from===to){el.textContent=fmt(to);return;}
+  const t0=performance.now(),dur=700;
+  function frame(t){
+    const p=Math.min(1,(t-t0)/dur),e=1-Math.pow(1-p,3);
+    el.textContent=fmt(Math.round(from+(to-from)*e));
+    if(p<1)requestAnimationFrame(frame);
+  }
+  requestAnimationFrame(frame);
+}
+
 let currentUser = null;
 let sessions = {};
 let templates = [];
@@ -112,6 +139,7 @@ function updateThemeToggleIcon() {
   if (!btn) return;
   // Static ICONS markup only — safe for innerHTML
   btn.innerHTML = document.documentElement.getAttribute('data-theme') === 'light' ? ICONS.sun : ICONS.moon;
+  btn.classList.remove('spin');void btn.offsetWidth;btn.classList.add('spin');
 }
 function applyStoredTheme() {
   try {
@@ -261,21 +289,36 @@ function initUI() {
       if(page&&page.classList.contains('active'))window.renderProgressChart&&window.renderProgressChart();
     },150);
   });
+  animateNextStats=true;
   render();
+  staggerIn('exercise-list');
 }
 
 // ── PAGE NAV ──
+// Containers whose children get a staggered entrance on page entry
+const PAGE_STAGGER={today:['exercise-list'],history:['history-list'],templates:['template-list'],goals:['goals-content','week-history-list'],detail:['detail-exercises']};
 window.showPage = function(name) {
   document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
   document.querySelectorAll('.nav-btn').forEach(b=>b.classList.remove('active'));
-  document.getElementById('page-'+name).classList.add('active');
+  const page=document.getElementById('page-'+name);
+  page.classList.add('active');
   const navId = name==='detail'?'nav-history':('nav-'+name);
   const navEl = document.getElementById(navId);
   if(navEl) navEl.classList.add('active');
+  // Slide the gold indicator under the active tab
+  const ind=document.getElementById('nav-indicator');
+  if(ind&&navEl){
+    const idx=[...document.querySelectorAll('.nav-btn')].indexOf(navEl);
+    ind.style.transform='translateX('+(idx*100)+'%)';
+  }
   if(name==='history') renderHistory();
   if(name==='templates') renderTemplates();
   if(name==='goals') renderGoals();
   if(name==='progress') renderProgress();
+  if(!REDUCED_MOTION){
+    page.classList.remove('page-anim');void page.offsetWidth;page.classList.add('page-anim');
+    (PAGE_STAGGER[name]||[]).forEach(staggerIn);
+  }
   window.scrollTo(0,0);
 };
 
@@ -353,20 +396,31 @@ function getTodayBest(ei){
 
 function calcExVol(ex){return ex.sets.reduce((s,set)=>s+(parseFloat(set.kg)||0)*(parseFloat(set.reps)||0),0);}
 
+// One-shot flag: the next updateStats() call animates the numbers (set before
+// page-entry/import renders; keystroke updates stay instant).
+let animateNextStats=false;
 function updateStats(){
+  const animate=animateNextStats&&!REDUCED_MOTION;
+  animateNextStats=false;
   let totalSets=0,totalVol=0;
   currentSession.exercises.forEach(ex=>ex.sets.forEach(s=>{
     const kg=parseFloat(s.kg)||0,r=parseFloat(s.reps)||0;
     if(kg>0||r>0){totalSets++;totalVol+=kg*r;}
   }));
-  document.getElementById('stat-ex').textContent=currentSession.exercises.length;
-  document.getElementById('stat-sets').textContent=totalSets;
-  document.getElementById('stat-vol').textContent=Math.round(totalVol).toLocaleString('de');
+  const fmt=n=>n.toLocaleString('de');
+  [['stat-ex',currentSession.exercises.length],['stat-sets',totalSets],['stat-vol',Math.round(totalVol)]].forEach(([id,val])=>{
+    const el=document.getElementById(id);
+    if(animate)countUp(el,val,fmt);
+    else{el.dataset.val=val;el.textContent=fmt(val);}
+  });
   const fb=document.getElementById('finish-btn');
   if(fb){
     const hasExercises=currentSession.exercises.length>0;
+    const wasDisabled=fb.disabled;
     fb.disabled=!hasExercises;
     fb.classList.toggle('disabled',!hasExercises);
+    // One-shot sheen the moment the button becomes available
+    if(wasDisabled&&hasExercises&&!REDUCED_MOTION){fb.classList.remove('sheen');void fb.offsetWidth;fb.classList.add('sheen');}
   }
 }
 
@@ -542,7 +596,14 @@ window.updateSet = function(ei,si,field,input){
         const pr=getExPR(currentSession.exercises[ei].name);
         const kg=parseFloat(val)||0,reps=parseFloat(setObj.reps)||0;
         const isPR=kg>0&&(!pr||kg>pr.kg||(kg===pr.kg&&reps>=pr.reps));
-        rows[si].querySelectorAll('.set-input')[0].className='set-input'+(isPR?' pr-value':'');
+        const kgInput=rows[si].querySelectorAll('.set-input')[0];
+        const hadPR=kgInput.classList.contains('pr-value');
+        kgInput.className='set-input'+(isPR?' pr-value':'');
+        // Gold burst the moment a set first crosses the PR threshold
+        if(isPR&&!hadPR&&!REDUCED_MOTION){
+          cards[ei].classList.remove('pr-burst');void cards[ei].offsetWidth;
+          cards[ei].classList.add('pr-burst');
+        }
       }
     }
   }
@@ -638,6 +699,9 @@ window.addCustomExercise = async function(){
 window.addExercise = function(name){
   currentSession.exercises.push({name,open:true,sets:[{kg:'',reps:''},{kg:'',reps:''},{kg:'',reps:''}]});
   scheduleSave();render();window.closeModal('modal-overlay');
+  // Pop only the new card — the rest of the list stays still
+  const last=document.getElementById('exercise-list').lastElementChild;
+  if(last&&!REDUCED_MOTION)last.classList.add('anim-in');
 };
 
 // ── HISTORY ──
@@ -701,6 +765,10 @@ function showDetail(key){
     <div class="stat-card"><div class="stat-num">${(s.exercises||[]).length}</div><div class="stat-lbl">Übungen</div></div>
     <div class="stat-card"><div class="stat-num">${totalSets}</div><div class="stat-lbl">Sätze</div></div>
     <div class="stat-card"><div class="stat-num">${Math.round(totalVol).toLocaleString('de')}</div><div class="stat-lbl">kg Total</div></div>`;
+  if(!REDUCED_MOTION){
+    const vals=[(s.exercises||[]).length,totalSets,Math.round(totalVol)];
+    document.querySelectorAll('#detail-stats .stat-num').forEach((el,i)=>{el.dataset.val=0;countUp(el,vals[i],n=>n.toLocaleString('de'));});
+  }
   const exEl=document.getElementById('detail-exercises');exEl.innerHTML='';
   const standingPRs=getStandingPRs();
   (s.exercises||[]).forEach(ex=>{
@@ -972,7 +1040,10 @@ window.doImport = function(mode){
   const newEx=tpl.exercises.map(e=>({name:e.name,open:true,sets:e.sets.map(s=>({kg:s.kg||'',reps:s.reps||''}))}));
   if(mode==='replace')currentSession.exercises=newEx;
   else currentSession.exercises=[...currentSession.exercises,...newEx];
-  scheduleSave();importingTemplateId=null;window.closeModal('import-modal-overlay');window.showPage('today');render();
+  scheduleSave();importingTemplateId=null;window.closeModal('import-modal-overlay');window.showPage('today');
+  animateNextStats=true;
+  render();
+  staggerIn('exercise-list');
 };
 
 // ── BACKLOG / VERGANGENES TRAINING ERFASSEN ──
@@ -1107,6 +1178,8 @@ window.addBacklogCustomExercise=async function(){
 window.addBacklogExercise=function(name){
   backlogSession.exercises.push({name,open:true,sets:[{kg:'',reps:''},{kg:'',reps:''},{kg:'',reps:''}]});
   window.closeModal('backlog-ex-modal-overlay');renderBacklogExercises();
+  const last=document.getElementById('backlog-exercise-list').lastElementChild;
+  if(last&&!REDUCED_MOTION)last.classList.add('anim-in');
 };
 
 // ── PROGRESS ──
@@ -1267,6 +1340,8 @@ function renderHeatmapMonth(year,month,container,prDays,todayKey){
     if(hasPR||exCount>0){
       cell.addEventListener('click',()=>showDetail(key));
     }
+    // Staggered cell entrance (month view only — the year view has 365+ cells)
+    if(!REDUCED_MOTION)cell.style.animationDelay=Math.min((firstWeekday+day-1)*12,500)+'ms';
     grid.appendChild(cell);
   }
 }
@@ -1347,7 +1422,10 @@ function getChartColors(){
   return {grid:v('--border'),text:v('--text-muted'),line:v('--accent'),fillTop:v('--accent-glow'),last:v('--gold')};
 }
 
+// In-flight reveal animation — cancelled on re-entry (theme toggle, resize, select change)
+let chartAnimFrame=null;
 window.renderProgressChart = function(){
+  if(chartAnimFrame){cancelAnimationFrame(chartAnimFrame);chartAnimFrame=null;}
   const canvas=document.getElementById('progress-chart');
   const ctx=canvas.getContext('2d');
   const name=document.getElementById('progress-ex-select').value;
@@ -1388,60 +1466,79 @@ window.renderProgressChart = function(){
   const maxKg=Math.ceil(Math.max(...points.map(p=>p.kg))*1.05);
   const rangeKg=maxKg-minKg||1;
 
-  // Grid lines
-  ctx.strokeStyle=col.grid;ctx.lineWidth=1;
-  const gridSteps=4;
-  for(let i=0;i<=gridSteps;i++){
-    const y=pad.top+cH-(cH/gridSteps)*i;
-    ctx.beginPath();ctx.moveTo(pad.left,y);ctx.lineTo(W-pad.right,y);ctx.stroke();
-    const val=Math.round(minKg+(rangeKg/gridSteps)*i);
-    ctx.fillStyle=col.text;ctx.font='11px Space Grotesk';ctx.textAlign='right';
-    ctx.fillText(val+'kg',pad.left-8,y+4);
+  // progress 0→1 reveals the series left-to-right via a clip rect
+  function draw(progress){
+    ctx.clearRect(0,0,W,H);
+
+    // Grid lines
+    ctx.strokeStyle=col.grid;ctx.lineWidth=1;
+    const gridSteps=4;
+    for(let i=0;i<=gridSteps;i++){
+      const y=pad.top+cH-(cH/gridSteps)*i;
+      ctx.beginPath();ctx.moveTo(pad.left,y);ctx.lineTo(W-pad.right,y);ctx.stroke();
+      const val=Math.round(minKg+(rangeKg/gridSteps)*i);
+      ctx.fillStyle=col.text;ctx.font='11px Space Grotesk';ctx.textAlign='right';
+      ctx.fillText(val+'kg',pad.left-8,y+4);
+    }
+
+    // X-labels
+    const labelCount=Math.min(points.length,5);
+    const step=Math.floor(points.length/labelCount);
+    for(let i=0;i<points.length;i+=step){
+      const x=pad.left+(cW/(points.length-1))*i;
+      const d=points[i].date.slice(5).replace('-','.');
+      ctx.fillStyle=col.text;ctx.font='10px Space Grotesk';ctx.textAlign='center';
+      ctx.fillText(d,x,H-8);
+    }
+
+    ctx.save();
+    ctx.beginPath();ctx.rect(0,0,W*progress,H);ctx.clip();
+
+    // Area fill
+    ctx.beginPath();
+    points.forEach((p,i)=>{
+      const x=pad.left+(cW/(points.length-1))*i;
+      const y=pad.top+cH-((p.kg-minKg)/rangeKg)*cH;
+      if(i===0)ctx.moveTo(x,y);else ctx.lineTo(x,y);
+    });
+    ctx.lineTo(pad.left+cW,pad.top+cH);
+    ctx.lineTo(pad.left,pad.top+cH);
+    ctx.closePath();
+    const grad=ctx.createLinearGradient(0,pad.top,0,pad.top+cH);
+    grad.addColorStop(0,col.fillTop);
+    grad.addColorStop(1,'transparent');
+    ctx.fillStyle=grad;ctx.fill();
+
+    // Line
+    ctx.beginPath();
+    points.forEach((p,i)=>{
+      const x=pad.left+(cW/(points.length-1))*i;
+      const y=pad.top+cH-((p.kg-minKg)/rangeKg)*cH;
+      if(i===0)ctx.moveTo(x,y);else ctx.lineTo(x,y);
+    });
+    ctx.strokeStyle=col.line;ctx.lineWidth=2.5;ctx.lineJoin='round';ctx.stroke();
+
+    // Dots — the most recent entry is highlighted in gold
+    points.forEach((p,i)=>{
+      const x=pad.left+(cW/(points.length-1))*i;
+      const y=pad.top+cH-((p.kg-minKg)/rangeKg)*cH;
+      const dotColor=i===points.length-1?col.last:col.line;
+      ctx.beginPath();ctx.arc(x,y,4,0,Math.PI*2);
+      ctx.fillStyle=dotColor;ctx.fill();
+      ctx.strokeStyle=dotColor;ctx.lineWidth=2;ctx.stroke();
+    });
+
+    ctx.restore();
   }
 
-  // X-labels
-  const labelCount=Math.min(points.length,5);
-  const step=Math.floor(points.length/labelCount);
-  for(let i=0;i<points.length;i+=step){
-    const x=pad.left+(cW/(points.length-1))*i;
-    const d=points[i].date.slice(5).replace('-','.');
-    ctx.fillStyle=col.text;ctx.font='10px Space Grotesk';ctx.textAlign='center';
-    ctx.fillText(d,x,H-8);
+  if(REDUCED_MOTION){draw(1);return;}
+  const t0=performance.now(),dur=600;
+  function tick(t){
+    const p=Math.min(1,(t-t0)/dur);
+    draw(1-Math.pow(1-p,3));
+    chartAnimFrame=p<1?requestAnimationFrame(tick):null;
   }
-
-  // Area fill
-  ctx.beginPath();
-  points.forEach((p,i)=>{
-    const x=pad.left+(cW/(points.length-1))*i;
-    const y=pad.top+cH-((p.kg-minKg)/rangeKg)*cH;
-    if(i===0)ctx.moveTo(x,y);else ctx.lineTo(x,y);
-  });
-  ctx.lineTo(pad.left+cW,pad.top+cH);
-  ctx.lineTo(pad.left,pad.top+cH);
-  ctx.closePath();
-  const grad=ctx.createLinearGradient(0,pad.top,0,pad.top+cH);
-  grad.addColorStop(0,col.fillTop);
-  grad.addColorStop(1,'transparent');
-  ctx.fillStyle=grad;ctx.fill();
-
-  // Line
-  ctx.beginPath();
-  points.forEach((p,i)=>{
-    const x=pad.left+(cW/(points.length-1))*i;
-    const y=pad.top+cH-((p.kg-minKg)/rangeKg)*cH;
-    if(i===0)ctx.moveTo(x,y);else ctx.lineTo(x,y);
-  });
-  ctx.strokeStyle=col.line;ctx.lineWidth=2.5;ctx.lineJoin='round';ctx.stroke();
-
-  // Dots — the most recent entry is highlighted in gold
-  points.forEach((p,i)=>{
-    const x=pad.left+(cW/(points.length-1))*i;
-    const y=pad.top+cH-((p.kg-minKg)/rangeKg)*cH;
-    const dotColor=i===points.length-1?col.last:col.line;
-    ctx.beginPath();ctx.arc(x,y,4,0,Math.PI*2);
-    ctx.fillStyle=dotColor;ctx.fill();
-    ctx.strokeStyle=dotColor;ctx.lineWidth=2;ctx.stroke();
-  });
+  chartAnimFrame=requestAnimationFrame(tick);
 }
 
 // ── KEYBOARD HANDLING ──
