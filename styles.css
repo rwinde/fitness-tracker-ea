@@ -138,6 +138,10 @@ html.standalone .app{padding-top:calc(env(safe-area-inset-top,47px) + 60px);padd
 .app-controls #user-name{font-size:var(--text-size-sm);color:var(--text-muted);max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;margin-right:auto}
 /* LOGIN */
 .login-screen{min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:20px;background:var(--bg)}
+.login-screen>*{animation:fadeRiseIn 0.6s var(--ease-out-expo) backwards}
+.login-screen>*:nth-child(2){animation-delay:0.08s}
+.login-screen>*:nth-child(3){animation-delay:0.16s}
+.login-screen>*:nth-child(4){animation-delay:0.24s}
 .login-title{font-family:'Space Grotesk',sans-serif;font-size:var(--text-size-2xl);font-weight:700;color:var(--text);text-align:center;letter-spacing:-0.02em;margin-bottom:6px}
 @supports (-webkit-background-clip:text){
   .login-title{background:linear-gradient(135deg,var(--text) 30%,var(--accent-bright));-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent}
@@ -158,7 +162,7 @@ html.standalone .app{padding-top:calc(env(safe-area-inset-top,47px) + 60px);padd
 .app-brand-name{font-family:'Space Grotesk',sans-serif;font-size:12px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.18em}
 .app-brand-tagline{font-family:'Space Grotesk',sans-serif;font-size:18px;font-weight:700;color:var(--accent);letter-spacing:0.02em;margin-top:2px}
 @supports (-webkit-background-clip:text){
-  .app-brand-tagline{background:var(--grad-gold);background-size:200% auto;-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent}
+  .app-brand-tagline{background:var(--grad-gold);background-size:200% auto;background-position:0% center;-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;animation:taglineSheenOnce 1.6s ease-out 0.4s backwards}
 }
 /* HERO */
 .hero{background:var(--grad-surface);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);border:1px solid var(--border-gold);border-radius:var(--radius);overflow:hidden;margin-bottom:var(--space-12);display:flex;width:100%;position:relative;box-shadow:var(--shadow-md),var(--glow-gold)}
@@ -180,7 +184,7 @@ html.standalone .app{padding-top:calc(env(safe-area-inset-top,47px) + 60px);padd
 .login-hero img{width:100%;height:100%;object-fit:cover;object-position:center top;border-radius:calc(var(--radius) - 2px);filter:saturate(0.85) contrast(1.05)}
 /* SYNC */
 .sync-bar{font-size:15px;color:var(--text-muted);text-align:center;padding:var(--space-8) 0 var(--space-12);letter-spacing:0.02em;transition:color 0.3s}
-.sync-bar.syncing{color:var(--gold)}
+.sync-bar.syncing{color:var(--gold);animation:syncPulse 1.2s ease-in-out infinite}
 .sync-bar.synced{color:var(--green)}
 .sync-bar.error{color:var(--red)}
 /* WEEKDAYS */
@@ -227,11 +231,11 @@ html.standalone .app{padding-top:calc(env(safe-area-inset-top,47px) + 60px);padd
 .exercise-name{flex:1;font-family:'Space Grotesk',sans-serif;font-size:var(--text-size-md);font-weight:600;color:var(--text)}
 .pr-badge{font-size:var(--text-size-sm);padding:var(--space-4) 10px;border-radius:var(--radius-pill);font-weight:600;white-space:nowrap;letter-spacing:0.02em}
 .pr-badge.has{background:var(--accent-dim);color:var(--accent)}
-.pr-badge.new-pr{background:var(--gold);color:var(--text-on-gold)}
+.pr-badge.new-pr{background:var(--gold);color:var(--text-on-gold);animation:badgePop 0.5s var(--ease-spring)}
 .pr-badge.none{background:var(--surface2);color:var(--text-muted)}
 .exercise-toggle{font-size:var(--text-size-sm);color:var(--text-muted);transition:transform 0.2s;display:inline-flex}
 .exercise-toggle.open{transform:rotate(180deg)}
-.exercise-body{padding:0 var(--space-16) 14px;border-top:1px solid var(--border);background:var(--surface)}
+.exercise-body{padding:0 var(--space-16) 14px;border-top:1px solid var(--border);background:var(--surface);animation:bodyExpand 0.3s var(--ease-out-expo)}
 .sets-table{width:100%;border-collapse:collapse;margin-top:var(--space-12)}
 .sets-table th{font-size:var(--text-size-sm);color:var(--text-muted);text-align:center;padding:var(--space-4) 6px;font-weight:500;letter-spacing:0.04em}
 .sets-table th:first-child{text-align:left}
@@ -318,7 +322,7 @@ html.standalone .app{padding-top:calc(env(safe-area-inset-top,47px) + 60px);padd
 .week-goal-count.zero{color:var(--text-muted)}
 .progress-bar-wrap{padding:0 var(--space-16) var(--space-16)}
 .progress-bar-bg{height:8px;background:var(--surface3);border-radius:4px;overflow:hidden}
-.progress-bar-fill{height:100%;width:var(--progress,0%);background:var(--grad-gold);border-radius:4px;transition:width 0.4s ease}
+.progress-bar-fill{height:100%;width:var(--progress,0%);background:var(--grad-gold);border-radius:4px;transition:width 0.4s ease;animation:barFill 0.8s var(--ease-out-expo)}
 .progress-bar-fill.done{background:linear-gradient(90deg,var(--gold),#ffdf7e)}
 .progress-bar-label{display:flex;justify-content:space-between;font-size:var(--text-size-sm);color:var(--text-muted);margin-top:6px;font-weight:500}
 .goal-card-inner{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:var(--space-16)}
@@ -391,8 +395,8 @@ html.standalone .app{padding-top:calc(env(safe-area-inset-top,47px) + 60px);padd
 .exercise-select:focus{border-color:var(--accent)}
 /* MODAL */
 .modal-overlay{display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.8);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);z-index:100;align-items:flex-start;justify-content:center;padding-top:calc(env(safe-area-inset-top,0px) + var(--space-12))}
-.modal-overlay.open{display:flex}
-.modal{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:20px;width:100%;max-width:480px;max-height:82vh;overflow-y:auto;animation:slideDown 0.25s ease;margin:0 var(--space-12);box-shadow:var(--shadow-lg);position:relative}
+.modal-overlay.open{display:flex;animation:overlayIn 0.25s ease}
+.modal{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:20px;width:100%;max-width:480px;max-height:82vh;overflow-y:auto;animation:modalIn 0.38s var(--ease-out-expo);margin:0 var(--space-12);box-shadow:var(--shadow-lg);position:relative}
 .modal::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;background:var(--grad-gold);border-radius:var(--radius) var(--radius) 0 0}
 .modal-title{font-family:'Space Grotesk',sans-serif;font-size:17px;font-weight:700;color:var(--text);margin-bottom:var(--space-16)}
 .modal-close{float:right;background:none;border:none;color:var(--text-muted);cursor:pointer;font-size:var(--text-size-xl);line-height:1;padding:0;transition:color 0.15s}
@@ -432,9 +436,9 @@ html.standalone .app{padding-top:calc(env(safe-area-inset-top,47px) + 60px);padd
 .import-option-title{font-family:'Space Grotesk',sans-serif;font-size:var(--text-size-sm);font-weight:600;color:var(--text)}
 .import-option-desc{font-size:var(--text-size-sm);color:var(--text-secondary);margin-top:2px}
 /* EMPTY STATE */
-.empty-state{display:flex;flex-direction:column;align-items:center;justify-content:center;padding:var(--space-40) 20px;text-align:center;min-height:200px}
+.empty-state{display:flex;flex-direction:column;align-items:center;justify-content:center;padding:var(--space-40) 20px;text-align:center;min-height:200px;animation:fadeRiseIn 0.5s var(--ease-out-expo)}
 .empty-state-icon{margin-bottom:var(--space-16);opacity:0.35;color:var(--accent);position:relative;display:flex}
-.empty-state-icon .icon{width:56px;height:56px;stroke-width:1.5}
+.empty-state-icon .icon{width:56px;height:56px;stroke-width:1.5;animation:emptyFloat 5s ease-in-out infinite}
 .empty-state-icon::before{content:'';position:absolute;inset:-18px;background:radial-gradient(circle,var(--accent-dim),transparent 70%);border-radius:50%}
 .empty-state-title{font-family:'Space Grotesk',sans-serif;font-size:var(--text-size-md);font-weight:600;color:var(--text-muted);margin-bottom:var(--space-8)}
 .empty-state-sub{font-size:15px;color:var(--text-muted);line-height:1.5;opacity:0.7}
@@ -444,9 +448,38 @@ html.standalone .app{padding-top:calc(env(safe-area-inset-top,47px) + 60px);padd
 input[type=number]::-webkit-inner-spin-button,input[type=number]::-webkit-outer-spin-button{-webkit-appearance:none;margin:0}
 input[type=number]{-moz-appearance:textfield}
 button,.exercise-option,.session-card,.template-card{-webkit-tap-highlight-color:transparent}
+/* ===== ANIMATIONS =====
+   Motion policy: event-driven only (page entry, interaction, value change).
+   The only infinite loops are syncPulse (status feedback) and emptyFloat (subtle). */
+@keyframes fadeRiseIn{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:translateY(0)}}
+@keyframes pageEnter{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
+@keyframes cardIn{from{opacity:0;transform:translateY(16px) scale(0.98)}to{opacity:1;transform:translateY(0) scale(1)}}
+@keyframes cellIn{from{opacity:0;transform:scale(0.85)}to{opacity:1;transform:scale(1)}}
+@keyframes barFill{from{width:0}}
+@keyframes btnSheenOnce{from{transform:translateX(-160%) skewX(-18deg)}to{transform:translateX(320%) skewX(-18deg)}}
+@keyframes badgePop{0%{transform:scale(0)}70%{transform:scale(1.15)}100%{transform:scale(1)}}
+@keyframes taglineSheenOnce{from{background-position:200% center}to{background-position:0% center}}
+@keyframes modalIn{from{opacity:0;transform:translateY(24px) scale(0.97)}to{opacity:1;transform:translateY(0) scale(1)}}
+@keyframes overlayIn{from{opacity:0}to{opacity:1}}
+@keyframes navIconPop{0%{transform:scale(0.85)}60%{transform:scale(1.12)}100%{transform:scale(1)}}
+@keyframes emptyFloat{0%,100%{transform:translateY(0)}50%{transform:translateY(-3px)}}
+@keyframes syncPulse{0%,100%{opacity:1}50%{opacity:0.45}}
+@keyframes bodyExpand{from{opacity:0;transform:translateY(-6px)}to{opacity:1;transform:translateY(0)}}
+@keyframes prBurst{from{opacity:0.8;transform:scale(0.6)}to{opacity:0;transform:scale(1.35)}}
+@keyframes themeIconSpin{from{transform:rotate(-120deg) scale(0.6);opacity:0}to{transform:rotate(0) scale(1);opacity:1}}
 @keyframes prFlash{0%{box-shadow:var(--glow-gold-strong)}100%{box-shadow:none}}
 .pr-flash{animation:prFlash 2s ease}
-@keyframes slideDown{from{transform:translateY(-30px);opacity:0}to{transform:translateY(0);opacity:1}}
+/* Opt-in entrance — added by staggerIn() from showPage, never baked into renderers */
+.anim-in{animation:cardIn 0.45s var(--ease-out-expo) backwards}
+.page-anim{animation:pageEnter 0.35s var(--ease-out-expo)}
+.heatmap-grid .heatmap-cell{animation:cellIn 0.3s var(--ease-out-expo) backwards}
+.pr-burst::after{content:'';position:absolute;inset:0;border-radius:var(--radius);background:radial-gradient(circle,var(--gold-dim),transparent 70%);animation:prBurst 0.8s ease-out forwards;pointer-events:none}
+.nav-btn.active .nav-icon{animation:navIconPop 0.35s var(--ease-spring)}
+.theme-toggle.spin .icon{animation:themeIconSpin 0.4s var(--ease-spring)}
+/* One-shot sheen when the finish button flips disabled→enabled (class set by updateStats) */
+.finish-btn::after{content:'';position:absolute;top:0;bottom:0;left:0;width:40%;background:linear-gradient(105deg,transparent,rgba(255,255,255,0.35),transparent);transform:translateX(-160%) skewX(-18deg);pointer-events:none}
+.finish-btn.sheen::after{animation:btnSheenOnce 0.9s ease-out}
+.drag-clone,.drag-clone *{animation:none!important}
 @media (prefers-reduced-motion: reduce){
   *,*::before,*::after{animation-duration:0.01ms!important;animation-iteration-count:1!important;transition-duration:0.01ms!important}
 }
