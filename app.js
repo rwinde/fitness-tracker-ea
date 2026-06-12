@@ -1,6 +1,6 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
 import { getAuth, GoogleAuthProvider, signInWithPopup, onAuthStateChanged, signOut as fbSignOut } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
-import { getFirestore, doc, getDoc, setDoc, deleteDoc, collection, getDocs } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+import { initializeFirestore, persistentLocalCache, persistentMultipleTabManager, doc, getDoc, setDoc, deleteDoc, collection, getDocs } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 
 const firebaseConfig = {
   apiKey: "AIzaSyDb7vt_KFwn0Bw0szJ6wfFWoW_rvCdHjkA",
@@ -13,7 +13,11 @@ const firebaseConfig = {
 
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
-const db = getFirestore(app);
+// Persistent offline cache (IndexedDB): the app keeps working without
+// network (e.g. in the gym) and repeated reads don't hit Firestore again.
+const db = initializeFirestore(app, {
+  localCache: persistentLocalCache({tabManager: persistentMultipleTabManager()})
+});
 const provider = new GoogleAuthProvider();
 
 
@@ -124,16 +128,21 @@ function setSyncStatus(status, msg) {
 async function loadAllData() {
   setSyncStatus('syncing', '↑↓ Wird synchronisiert…');
   try {
-    const sessSnap = await getDocs(collection(db, 'users', currentUser.uid, 'sessions'));
+    const uid = currentUser.uid;
+    // The four reads are independent — fetch them in parallel
+    const [sessSnap, tplSnap, custSnap, goalsSnap] = await Promise.all([
+      getDocs(collection(db, 'users', uid, 'sessions')),
+      getDoc(doc(db, 'users', uid, 'data', 'templates')),
+      getDoc(doc(db, 'users', uid, 'data', 'custom')),
+      getDoc(doc(db, 'users', uid, 'data', 'goals')),
+    ]);
     sessions = {};
     sessSnap.forEach(d => { sessions[d.id] = d.data(); });
-    currentSession = sessions[getTodayKey()] ? JSON.parse(JSON.stringify(sessions[getTodayKey()])) : {exercises:[], notes:''};
+    invalidatePRCache();
+    currentSession = sessions[getTodayKey()] ? structuredClone(sessions[getTodayKey()]) : {exercises:[], notes:''};
     document.getElementById('notes').value = currentSession.notes || '';
-    const tplSnap = await getDoc(doc(db, 'users', currentUser.uid, 'data', 'templates'));
     templates = tplSnap.exists() ? (tplSnap.data().list || []) : [];
-    const custSnap = await getDoc(doc(db, 'users', currentUser.uid, 'data', 'custom'));
     customExercises = custSnap.exists() ? (custSnap.data().list || []) : [];
-    const goalsSnap = await getDoc(doc(db, 'users', currentUser.uid, 'data', 'goals'));
     goals = goalsSnap.exists() ? goalsSnap.data() : {trainDays: 3};
     setSyncStatus('synced', '✓ Synchronisiert');
     setTimeout(() => setSyncStatus('', 'Bereit'), 2000);
@@ -151,7 +160,8 @@ async function saveSession() {
   const key=getTodayKey();
   try {
     await setDoc(doc(db, 'users', currentUser.uid, 'sessions', key), currentSession);
-    sessions[key] = JSON.parse(JSON.stringify(currentSession));
+    sessions[key] = structuredClone(currentSession);
+    invalidatePRCache();
     setSyncStatus('synced', '✓ Gespeichert');
     setTimeout(() => setSyncStatus('', 'Bereit'), 1500);
     return true;
@@ -277,18 +287,33 @@ async function ensureCustomExercise(rawName){
   return q;
 }
 
-function getExPR(name){
-  let best=null;
+// PR lookup cache. getExPR used to scan ALL sessions on every call — and it
+// is called per exercise on each render(), per option in the picker and on
+// every kg keystroke. The cache builds the map once per data state in a
+// single pass; sessions mutations must call invalidatePRCache().
+// Today is excluded (a PR is always measured against PAST sessions), so the
+// cache also tracks which day it was built for and rebuilds after midnight.
+let prCache=null, prCacheDay=null;
+function invalidatePRCache(){prCache=null;}
+function buildPRCache(todayKey){
+  const map=new Map(); // exact exercise name -> {kg, reps}
   Object.entries(sessions).forEach(([k,s])=>{
-    if(k===getTodayKey())return;
+    if(k===todayKey)return;
     (s.exercises||[]).forEach(ex=>{
-      if(ex.name===name)ex.sets.forEach(set=>{
+      let best=map.get(ex.name)||null;
+      ex.sets.forEach(set=>{
         const kg=parseFloat(set.kg)||0,reps=parseFloat(set.reps)||0;
         if(kg>0&&(!best||kg>best.kg||(kg===best.kg&&reps>best.reps)))best={kg,reps};
       });
+      if(best)map.set(ex.name,best);
     });
   });
-  return best;
+  return map;
+}
+function getExPR(name){
+  const today=getTodayKey();
+  if(!prCache||prCacheDay!==today){prCache=buildPRCache(today);prCacheDay=today;}
+  return prCache.get(name)||null;
 }
 
 function getTodayBest(ei){
@@ -664,7 +689,7 @@ window.editSession = function(){
   if(!currentDetailKey||!sessions[currentDetailKey])return;
   backlogKey=currentDetailKey;
   backlogOriginalKey=currentDetailKey; // remember original date for potential date change
-  backlogSession=JSON.parse(JSON.stringify(sessions[currentDetailKey]));
+  backlogSession=structuredClone(sessions[currentDetailKey]);
   backlogSession.exercises.forEach(ex=>ex.open=true);
   const d=new Date(currentDetailKey+'T12:00:00');
   const dayIdx=(d.getDay()+6)%7;
@@ -685,6 +710,7 @@ window.deleteSession = async function(){
   try{
     await deleteDoc(doc(db,'users',currentUser.uid,'sessions',currentDetailKey));
     delete sessions[currentDetailKey];
+    invalidatePRCache();
     // If deleting today's session, reset currentSession too
     if(currentDetailKey===getTodayKey()){
       currentSession={exercises:[],notes:''};
@@ -807,7 +833,7 @@ window.deleteTemplate = async function(ti){
 };
 window.openTemplateEditor = function(ti){
   if(ti===null){editingTemplate={id:Date.now(),name:'',exercises:[]};document.getElementById('tpl-editor-title').textContent='Neue Vorlage';document.getElementById('tpl-name-input').value='';}
-  else{editingTemplate=JSON.parse(JSON.stringify(templates[ti]));editingTemplate._editIdx=ti;document.getElementById('tpl-editor-title').textContent='Vorlage bearbeiten';document.getElementById('tpl-name-input').value=editingTemplate.name;}
+  else{editingTemplate=structuredClone(templates[ti]);editingTemplate._editIdx=ti;document.getElementById('tpl-editor-title').textContent='Vorlage bearbeiten';document.getElementById('tpl-name-input').value=editingTemplate.name;}
   renderTplExList();window.openModal('tpl-editor-overlay');
 };
 function renderTplExList(){
@@ -909,7 +935,7 @@ window.confirmBacklogDate = function(){
   backlogKey = dateStr;
   // Track an existing entry so a later date change deletes the original instead of duplicating it
   backlogOriginalKey = sessions[dateStr] ? dateStr : null;
-  backlogSession = sessions[dateStr] ? JSON.parse(JSON.stringify(sessions[dateStr])) : {exercises:[], notes:''};
+  backlogSession = sessions[dateStr] ? structuredClone(sessions[dateStr]) : {exercises:[], notes:''};
   const d=new Date(dateStr+'T12:00:00');
   const dayIdx=(d.getDay()+6)%7;
   document.getElementById('backlog-date-label').textContent=DAYS_FULL[dayIdx]+', '+d.getDate()+'. '+monthsFull[d.getMonth()]+' '+d.getFullYear();
@@ -960,10 +986,11 @@ window.saveBacklog = async function(){
       }
     }
     await setDoc(doc(db,'users',currentUser.uid,'sessions',backlogKey),backlogSession);
-    sessions[backlogKey]=JSON.parse(JSON.stringify(backlogSession));
+    sessions[backlogKey]=structuredClone(backlogSession);
+    invalidatePRCache();
     // If saving to today, update currentSession too
     if(backlogKey===getTodayKey()){
-      currentSession=JSON.parse(JSON.stringify(backlogSession));
+      currentSession=structuredClone(backlogSession);
       document.getElementById('notes').value=currentSession.notes||'';
     }
     setSyncStatus('synced','✓ Gespeichert');
