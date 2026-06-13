@@ -713,7 +713,7 @@ function filterExercisePicker(cfg){
     if(showLabels)html+=`<div class="muscle-label">${muscle}</div>`;
     exs.forEach(e=>{
       const isCustom=cfg.showCustomBadge&&e.muscle==='Eigene';
-      const badge=isCustom?' <span style="font-size:10px;color:var(--accent)">✓ eigene</span>':'';
+      const badge=isCustom?' <span style="font-size:11px;color:var(--accent)">✓ eigene</span>':'';
       let prHtml='';
       if(cfg.showPR){
         const pr=getExPR(e.name);
@@ -927,7 +927,7 @@ function renderGoals(){
           <div class="week-goal-title">Trainingstage diese Woche</div>
           <div class="week-goal-sub">${done?ICONS.checkCircle+' Ziel erreicht!':((goal-trained)+' Tag'+(goal-trained===1?'':'e')+' noch nötig')}</div>
         </div>
-        <div class="week-goal-count ${done?'done':trained>0?'progress':'zero'}">${trained}<span style="font-size:14px;color:var(--text-muted)">/${goal}</span></div>
+        <div class="week-goal-count ${done?'done':trained>0?'progress':'zero'}">${trained}<span style="font-size:16px;color:var(--text-muted)">/${goal}</span></div>
       </div>
       <div class="progress-bar-wrap">
         <div class="progress-bar-bg"><div class="progress-bar-fill${done?' done':''}" style="--progress:${pct}%"></div></div>
