@@ -14,9 +14,9 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="styles.css?v=v2.8.3">
+<link rel="stylesheet" href="styles.css?v=v2.9.0">
 <script>
-var APP_VERSION='v2.8.3';
+var APP_VERSION='v2.9.0';
 // Legacy cleanup: unregister service workers from old app versions
 if('serviceWorker' in navigator){navigator.serviceWorker.getRegistrations().then(regs=>regs.forEach(r=>r.unregister()));}
 // Detect standalone mode reliably on iOS
@@ -181,10 +181,21 @@ if(document.readyState==='loading'){
 
 </div>
 
-<div class="app-controls" id="app-controls" style="display:none">
-  <span id="user-name"></span>
-  <button class="theme-toggle" id="theme-toggle" onclick="toggleTheme()" aria-label="Theme umschalten"><span data-icon="moon"></span></button>
-  <button class="logout-btn" onclick="signOut()">Abmelden</button>
+<div class="profile" id="profile" style="display:none">
+  <button class="profile-avatar" id="profile-btn" onclick="toggleProfileMenu(event)"
+          aria-haspopup="true" aria-expanded="false" aria-label="Profilmenü">
+    <span id="profile-initials"></span>
+  </button>
+  <div class="profile-menu" id="profile-menu" role="menu">
+    <div class="profile-menu-name" id="user-name"></div>
+    <button class="profile-menu-row" id="theme-toggle" onclick="toggleTheme()" role="menuitemcheckbox">
+      <span class="profile-menu-row-label"><span id="theme-toggle-icon"></span>Dark Mode</span>
+      <span class="switch" id="theme-switch"><span class="switch-knob"></span></span>
+    </button>
+    <button class="profile-menu-row profile-menu-row--logout" onclick="signOut()" role="menuitem">
+      <span data-icon="logOut"></span>Abmelden
+    </button>
+  </div>
 </div>
 
 <div class="bottom-nav" id="bottom-nav" style="display:none">
@@ -270,6 +281,6 @@ if(document.readyState==='loading'){
   </div>
 </div>
 
-<script type="module" src="app.js?v=v2.8.3"></script>
+<script type="module" src="app.js?v=v2.9.0"></script>
 </body>
 </html>

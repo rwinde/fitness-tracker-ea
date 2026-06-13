@@ -82,6 +82,7 @@ const ICONS={
   trendingUp:`<svg ${ICON_ATTRS}><polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/><polyline points="16 7 22 7 22 13"/></svg>`,
   rotateCcw:`<svg ${ICON_ATTRS}><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>`,
   plus:`<svg ${ICON_ATTRS}><path d="M5 12h14"/><path d="M12 5v14"/></svg>`,
+  logOut:`<svg ${ICON_ATTRS}><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" x2="9" y1="12" y2="12"/></svg>`,
 };
 // Hydrate static markup: index.html carries <span data-icon="…"> placeholders so
 // every SVG lives only here in the registry. Runs at module init — the app
@@ -156,12 +157,32 @@ window.toggleTheme = function() {
   if (progressPage && progressPage.classList.contains('active') && window.renderProgressChart) window.renderProgressChart();
 };
 function updateThemeToggleIcon() {
+  const isLight = document.documentElement.getAttribute('data-theme') === 'light';
+  const iconEl = document.getElementById('theme-toggle-icon');
+  const switchEl = document.getElementById('theme-switch');
   const btn = document.getElementById('theme-toggle');
-  if (!btn) return;
   // Static ICONS markup only — safe for innerHTML
-  btn.innerHTML = document.documentElement.getAttribute('data-theme') === 'light' ? ICONS.sun : ICONS.moon;
-  replayAnim(btn,'spin');
+  if (iconEl) iconEl.innerHTML = isLight ? ICONS.sun : ICONS.moon;
+  if (switchEl) switchEl.classList.toggle('on', !isLight); // switch on = Dark Mode active
+  if (btn) replayAnim(btn, 'spin');
 }
+window.toggleProfileMenu = function(e) {
+  e.stopPropagation();
+  const menu = document.getElementById('profile-menu');
+  const btn = document.getElementById('profile-btn');
+  const open = menu.classList.toggle('open');
+  btn.setAttribute('aria-expanded', open ? 'true' : 'false');
+};
+// Close the profile menu on any click outside of it
+document.addEventListener('click', (e) => {
+  const menu = document.getElementById('profile-menu');
+  if (!menu || !menu.classList.contains('open')) return;
+  const profile = document.getElementById('profile');
+  if (profile && !profile.contains(e.target)) {
+    menu.classList.remove('open');
+    document.getElementById('profile-btn').setAttribute('aria-expanded', 'false');
+  }
+});
 function applyStoredTheme() {
   try {
     if (localStorage.getItem('theme') === 'light') document.documentElement.setAttribute('data-theme', 'light');
@@ -180,7 +201,7 @@ onAuthStateChanged(auth, async (user) => {
     document.getElementById('loading-screen').style.display = 'none';
     document.getElementById('main-app').style.display = 'block';
     document.getElementById('bottom-nav').style.display = 'flex';
-    document.getElementById('app-controls').style.display = 'flex';
+    document.getElementById('profile').style.display = 'block';
     initUI();
   } else {
     currentUser = null;
@@ -188,7 +209,7 @@ onAuthStateChanged(auth, async (user) => {
     document.getElementById('login-screen').style.display = 'flex';
     document.getElementById('main-app').style.display = 'none';
     document.getElementById('bottom-nav').style.display = 'none';
-    document.getElementById('app-controls').style.display = 'none';
+    document.getElementById('profile').style.display = 'none';
   }
 });
 
@@ -269,11 +290,24 @@ function scheduleSave() {
   saveTimer = setTimeout(saveSession, 1200);
 }
 
+// Two-letter initials from the display name (first + last), else first email char
+function getInitials(user) {
+  const dn = (user.displayName || '').trim();
+  if (dn) {
+    const parts = dn.split(/\s+/);
+    const first = parts[0][0] || '';
+    const last = parts.length > 1 ? parts[parts.length - 1][0] : '';
+    return (first + last).toUpperCase();
+  }
+  return ((user.email || '?')[0] || '?').toUpperCase();
+}
+
 // ── UI INIT ──
 function initUI() {
   const today = new Date();
-  const firstName = (currentUser.displayName||currentUser.email||'').split('@')[0];
-  document.getElementById('user-name').textContent = firstName;
+  const userLabel = (currentUser.displayName||currentUser.email||'').split('@')[0];
+  document.getElementById('user-name').textContent = userLabel;
+  document.getElementById('profile-initials').textContent = getInitials(currentUser);
   document.getElementById('datedisp').textContent = today.getDate();
   document.getElementById('monthdisp').textContent = months[today.getMonth()] + ' ' + today.getFullYear();
   const wdEl = document.getElementById('weekdays');
