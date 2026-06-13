@@ -42,12 +42,12 @@
   --grad-gold:linear-gradient(135deg,#c8a25c,#8c6a2f);
 }
 html,body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;min-height:100vh;min-height:100dvh;-webkit-text-size-adjust:100%;text-size-adjust:100%;overflow-x:hidden;font-size:var(--text-size-lg)}
-.app{max-width:500px;margin:0 auto;min-height:100dvh;padding:60px 18px 200px 18px;-webkit-overflow-scrolling:touch}
+.app{max-width:500px;margin:0 auto;min-height:100dvh;padding:52px 18px 200px 18px;-webkit-overflow-scrolling:touch}
 /* Standalone PWA — detected via JS (window.navigator.standalone on iOS) */
-html.standalone .app{padding-top:calc(env(safe-area-inset-top,47px) + 60px);padding-bottom:calc(env(safe-area-inset-bottom,34px)+200px)}
+html.standalone .app{padding-top:calc(env(safe-area-inset-top,47px) + 52px);padding-bottom:calc(env(safe-area-inset-bottom,34px)+200px)}
 /* Hard fallback if env() doesn't work */
 @supports not (padding: env(safe-area-inset-top)){
-  html.standalone .app{padding-top:60px}
+  html.standalone .app{padding-top:52px}
 }
 /* Larger phones */
 @media screen and (min-width:390px){
@@ -95,10 +95,23 @@ html.standalone .app{padding-top:calc(env(safe-area-inset-top,47px) + 60px);padd
 .nav-btn.active{color:var(--accent)}
 .nav-icon{display:flex;line-height:1}
 .nav-icon .icon{width:22px;height:22px;stroke-width:1.8}
-/* APP CONTROLS — fixed top navigation bar (user name · theme toggle · logout) */
-.app-controls{position:fixed;top:0;left:0;right:0;z-index:60;display:flex;align-items:center;gap:8px;padding:12px 14px;padding-top:calc(env(safe-area-inset-top,0px) + 12px);background:rgba(10,9,8,0.82);backdrop-filter:blur(20px) saturate(1.4);-webkit-backdrop-filter:blur(20px) saturate(1.4);border-bottom:1px solid var(--border-gold)}
-[data-theme="light"] .app-controls{background:rgba(255,253,247,0.85)}
-.app-controls #user-name{font-size:var(--text-size-sm);color:var(--text-muted);max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;margin-right:auto}
+/* PROFILE — floating avatar (top-right) with a dropdown menu */
+.profile{position:fixed;top:calc(env(safe-area-inset-top,0px) + 10px);right:14px;z-index:60}
+.profile-avatar{width:40px;height:40px;border-radius:50%;background:var(--surface2);border:1px solid var(--border-gold);color:var(--accent);font-family:'Space Grotesk',sans-serif;font-size:14px;font-weight:700;letter-spacing:0.02em;display:flex;align-items:center;justify-content:center;cursor:pointer;box-shadow:0 2px 10px rgba(0,0,0,0.35);transition:transform 0.15s,filter 0.15s;-webkit-tap-highlight-color:transparent}
+.profile-avatar:active{transform:scale(0.94)}
+.profile-menu{display:none;position:absolute;top:calc(100% + 8px);right:0;min-width:210px;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-sm);box-shadow:0 8px 28px rgba(0,0,0,0.4);overflow:hidden}
+.profile-menu.open{display:block;animation:profileMenuIn 0.18s var(--ease-out-expo)}
+@keyframes profileMenuIn{from{opacity:0;transform:translateY(-6px)}to{opacity:1;transform:translateY(0)}}
+.profile-menu-name{font-size:var(--text-size-sm);color:var(--text-muted);padding:12px 14px;border-bottom:1px solid var(--border);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.profile-menu-row{display:flex;align-items:center;justify-content:space-between;gap:10px;width:100%;min-height:46px;padding:0 14px;background:none;border:none;color:var(--text);font-family:'DM Sans',sans-serif;font-size:var(--text-size-sm);cursor:pointer;transition:background 0.15s;-webkit-tap-highlight-color:transparent}
+.profile-menu-row:active{background:var(--surface3)}
+.profile-menu-row-label{display:flex;align-items:center;gap:8px}
+.profile-menu-row--logout{color:var(--red);justify-content:flex-start;gap:8px;border-top:1px solid var(--border)}
+/* iOS-style toggle switch */
+.switch{position:relative;flex-shrink:0;width:40px;height:24px;border-radius:12px;background:var(--surface3);transition:background 0.2s}
+.switch.on{background:var(--accent)}
+.switch-knob{position:absolute;top:2px;left:2px;width:20px;height:20px;border-radius:50%;background:#fff;box-shadow:0 1px 3px rgba(0,0,0,0.4);transition:transform 0.2s var(--ease-spring)}
+.switch.on .switch-knob{transform:translateX(16px)}
 /* LOGIN */
 .login-screen{min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:20px;background:var(--bg)}
 .login-screen>*{animation:fadeRiseIn 0.6s var(--ease-out-expo) backwards}
@@ -112,11 +125,6 @@ html.standalone .app{padding-top:calc(env(safe-area-inset-top,47px) + 60px);padd
 .login-btn img{width:20px;height:20px}
 .login-error{color:var(--red);font-size:15px;margin-top:var(--space-12);text-align:center}
 .loading-screen{min-height:100vh;min-height:100dvh;display:flex;align-items:center;justify-content:center;background:var(--bg);font-family:'Space Grotesk',sans-serif;font-size:var(--text-size-sm);color:var(--text-muted);letter-spacing:0.05em}
-/* HEADER */
-.logout-btn{background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius-xs);color:var(--text-secondary);font-size:var(--text-size-sm);padding:6px 12px;cursor:pointer;font-family:'DM Sans',sans-serif;transition:all 0.15s}
-.logout-btn:active{background:var(--surface3)}
-.theme-toggle{background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius-xs);color:var(--text);font-size:var(--text-size-sm);padding:6px 10px;cursor:pointer;font-family:'DM Sans',sans-serif;transition:all 0.15s;line-height:1}
-.theme-toggle:active{background:var(--surface3)}
 /* BRAND */
 .app-brand{text-align:center;margin-bottom:10px}
 .app-brand-name{font-family:'Space Grotesk',sans-serif;font-size:12px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.18em}
@@ -425,7 +433,7 @@ button,.exercise-option,.session-card,.template-card{-webkit-tap-highlight-color
 .heatmap-grid .heatmap-cell{animation:cellIn 0.3s var(--ease-out-expo) backwards}
 .pr-burst::after{content:'';position:absolute;inset:0;border-radius:var(--radius);background:radial-gradient(circle,var(--gold-dim),transparent 70%);animation:prBurst 0.8s ease-out forwards;pointer-events:none}
 .nav-btn.active .nav-icon{animation:navIconPop 0.35s var(--ease-spring)}
-.theme-toggle.spin .icon{animation:themeIconSpin 0.4s var(--ease-spring)}
+#theme-toggle.spin .icon{animation:themeIconSpin 0.4s var(--ease-spring)}
 .drag-clone,.drag-clone *{animation:none!important}
 @media (prefers-reduced-motion: reduce){
   *,*::before,*::after{animation-duration:0.01ms!important;animation-iteration-count:1!important;transition-duration:0.01ms!important}
