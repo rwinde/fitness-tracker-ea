@@ -97,7 +97,7 @@ html.standalone .app{padding-top:calc(env(safe-area-inset-top,47px) + 52px);padd
 .nav-icon .icon{width:27px;height:27px;stroke-width:1.8}
 /* PROFILE — floating avatar (top-right) with a dropdown menu */
 .profile{position:fixed;top:calc(env(safe-area-inset-top,0px) + 10px);right:14px;z-index:60}
-.profile-avatar{width:40px;height:40px;border-radius:50%;background:var(--surface2);border:1px solid var(--border-gold);color:var(--accent);font-family:'Space Grotesk',sans-serif;font-size:16px;font-weight:700;letter-spacing:0.02em;display:flex;align-items:center;justify-content:center;cursor:pointer;box-shadow:0 2px 10px rgba(0,0,0,0.35);transition:transform 0.15s,filter 0.15s;-webkit-tap-highlight-color:transparent}
+.profile-avatar{width:44px;height:44px;border-radius:50%;background:var(--surface2);border:1px solid var(--border-gold);color:var(--accent);font-family:'Space Grotesk',sans-serif;font-size:19px;font-weight:700;letter-spacing:0.02em;display:flex;align-items:center;justify-content:center;cursor:pointer;box-shadow:0 2px 10px rgba(0,0,0,0.35);transition:transform 0.15s,filter 0.15s;-webkit-tap-highlight-color:transparent}
 .profile-avatar:active{transform:scale(0.94)}
 .profile-menu{display:none;position:absolute;top:calc(100% + 8px);right:0;min-width:210px;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-sm);box-shadow:0 8px 28px rgba(0,0,0,0.4);overflow:hidden}
 .profile-menu.open{display:block;animation:profileMenuIn 0.18s var(--ease-out-expo)}
