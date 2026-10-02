@@ -1,6 +1,6 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
 import { getAuth, GoogleAuthProvider, signInWithPopup, onAuthStateChanged, signOut as fbSignOut } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
-import { initializeFirestore, persistentLocalCache, persistentMultipleTabManager, doc, getDoc, setDoc, deleteDoc, collection, getDocs } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+import { initializeFirestore, persistentLocalCache, persistentMultipleTabManager, doc, getDoc, setDoc, deleteDoc, collection, getDocs, writeBatch, onSnapshot } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 
 const firebaseConfig = {
   apiKey: "AIzaSyDb7vt_KFwn0Bw0szJ6wfFWoW_rvCdHjkA",
@@ -132,17 +132,25 @@ let templates = [];
 let customExercises = [];
 let goals = {trainDays: 3};
 let currentSession = {exercises:[], notes:''};
+let currentKey = getTodayKey(); // day the open training belongs to
 let editingTemplate = null;
+let tplSeen; // stamp of the stored template the editor started from
 let importingTemplateId = null;
 let saveTimer = null;
+let lastEditAt = 0;
 let dragSrcIdx = null;
+// Every auth change bumps authGen; async results that started under an older
+// generation are dropped. activeUid is set only once the account's data has
+// loaded — all writes go there, so nothing is saved before (or after) that.
+let authGen = 0;
+let activeUid = null;
 
 // ── AUTH ──
 window.signInWithGoogle = async () => {
   try { await signInWithPopup(auth, provider); }
   catch(e) { document.getElementById('login-error').textContent = 'Anmeldung fehlgeschlagen. Bitte erneut versuchen.'; }
 };
-window.signOut = async () => { await fbSignOut(auth); };
+window.signOut = async () => { flushSave(); await fbSignOut(auth); };
 
 window.toggleTheme = function() {
   const root = document.documentElement;
@@ -192,38 +200,114 @@ function applyStoredTheme() {
 applyStoredTheme();
 
 onAuthStateChanged(auth, async (user) => {
+  authGen++;
+  resetAccountState();
+  currentUser = user;
+  // Hide the previous account's UI at once — also on a direct A → B switch
+  // without a signed-out event in between
+  ['main-app', 'bottom-nav', 'profile'].forEach(id => document.getElementById(id).style.display = 'none');
   if(user) {
-    currentUser = user;
     document.getElementById('login-screen').style.display = 'none';
-    // Daten hinter dem Loading-Screen laden, damit die App in einem
-    // einzigen Schritt fertig gerendert erscheint (kein "Doppel-Laden" in der PWA)
-    await loadAllData();
-    document.getElementById('loading-screen').style.display = 'none';
-    document.getElementById('main-app').style.display = 'block';
-    document.getElementById('bottom-nav').style.display = 'flex';
-    document.getElementById('profile').style.display = 'block';
-    initUI();
+    await enterApp();
   } else {
-    currentUser = null;
     document.getElementById('loading-screen').style.display = 'none';
     document.getElementById('login-screen').style.display = 'flex';
-    document.getElementById('main-app').style.display = 'none';
-    document.getElementById('bottom-nav').style.display = 'none';
-    document.getElementById('profile').style.display = 'none';
   }
 });
 
+// Daten hinter dem Loading-Screen laden, damit die App in einem
+// einzigen Schritt fertig gerendert erscheint (kein "Doppel-Laden" in der PWA).
+// A failed initial load is an error state: the app stays closed, so nothing
+// can be edited or saved on top of missing data.
+async function enterApp() {
+  const gen = authGen;
+  const loading = document.getElementById('loading-screen');
+  loading.textContent = 'Wird geladen…';
+  loading.style.display = '';
+  const ok = await loadAllData();
+  if(gen !== authGen) return;
+  if(!ok) {
+    loading.innerHTML = '<div class="load-error">Daten konnten nicht geladen werden.<div class="load-error-actions"><button class="btn btn--primary btn--sm" onclick="retryLoad()">Erneut versuchen</button><button class="btn btn--secondary btn--sm" onclick="signOut()">Abmelden</button></div></div>';
+    return;
+  }
+  activeUid = currentUser.uid;
+  watchRemote(activeUid);
+  // Catch up templates with records logged on another device
+  syncTemplatesWithBests();
+  loading.style.display = 'none';
+  document.getElementById('main-app').style.display = 'block';
+  document.getElementById('bottom-nav').style.display = 'flex';
+  document.getElementById('profile').style.display = 'block';
+  initUI();
+}
+window.retryLoad = enterApp;
+
+// Drop everything account-bound, so a following account can never see — or
+// save — the previous account's data, drafts or open editors.
+function resetAccountState() {
+  activeUid = null;
+  unwatch();
+  setCurrentSession(null); // also cancels a pending autosave
+  currentKey = getTodayKey(); lastEditAt = 0;
+  sessions = {}; templates = []; customExercises = []; goals = {trainDays: 3};
+  invalidatePRCache();
+  editingTemplate = null; importingTemplateId = null; currentDetailKey = null;
+  backlogKey = null; backlogOriginalKey = null; backlogSession = {exercises:[], notes:''}; lostDrafts = {};
+  closeAllModals();
+  document.getElementById('profile-menu').classList.remove('open');
+  window.showPage('today');
+}
+
 // ── FIRESTORE ──
-function setSyncStatus(status, msg) {
+let statusTimer = null, toastTimer = null;
+// resetMs returns the bar to the neutral "Bereit" after a moment. Errors also
+// raise a toast, because the sync bar is only visible on the Heute page.
+function setSyncStatus(status, msg, resetMs) {
+  clearTimeout(statusTimer);
   const bar = document.getElementById('sync-bar');
   bar.className = 'sync-bar ' + status;
   bar.textContent = msg;
+  if(resetMs) statusTimer = setTimeout(() => setSyncStatus('', 'Bereit'), resetMs);
+  if(status === 'error') {
+    const toast = document.getElementById('sync-toast');
+    toast.textContent = msg;
+    toast.classList.add('show');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => toast.classList.remove('show'), 4000);
+  }
 }
 
+// Firestore is a trust boundary: stored documents are coerced into the shape
+// the renderers expect, so malformed data can't break rendering and kg/reps
+// are always plain numbers, never markup.
+const DATE_KEY = /^\d{4}-\d{2}-\d{2}$/;
+function cleanNum(field, v) {
+  const n = parseFloat(v);
+  return isFinite(n) && n >= 0 ? String(Math.min(n, field === 'kg' ? KG_MAX : REPS_MAX)) : '';
+}
+function cleanExercises(list) {
+  return (Array.isArray(list) ? list : []).filter(ex => ex && typeof ex.name === 'string').map(ex => ({
+    ...ex,
+    sets: (Array.isArray(ex.sets) ? ex.sets : []).map(s => ({kg: cleanNum('kg', s?.kg), reps: cleanNum('reps', s?.reps)})),
+  }));
+}
+function applySessions(snap) {
+  sessions = {};
+  snap.forEach(d => {
+    const s = d.data();
+    if(DATE_KEY.test(d.id)) sessions[d.id] = {exercises: cleanExercises(s?.exercises), notes: typeof s?.notes === 'string' ? s.notes : ''};
+  });
+  invalidatePRCache();
+}
+const listOf = snap => snap.exists() && Array.isArray(snap.data().list) ? snap.data().list : [];
+function applyTemplates(snap) { templates = listOf(snap).filter(t => t && typeof t.name === 'string').map(t => ({...t, exercises: cleanExercises(t.exercises)})); }
+function applyCustom(snap)    { customExercises = listOf(snap).filter(n => typeof n === 'string'); }
+function applyGoals(snap)     { goals = {trainDays: Math.min(7, Math.max(1, parseInt(snap.exists() && snap.data().trainDays) || 3))}; }
+
+// Returns true on success, false on failure (never rejects)
 async function loadAllData() {
-  setSyncStatus('syncing', '↑↓ Wird synchronisiert…');
+  const gen = authGen, uid = currentUser.uid;
   try {
-    const uid = currentUser.uid;
     // The four reads are independent — fetch them in parallel
     const [sessSnap, tplSnap, custSnap, goalsSnap] = await Promise.all([
       getDocs(collection(db, 'users', uid, 'sessions')),
@@ -231,64 +315,157 @@ async function loadAllData() {
       getDoc(doc(db, 'users', uid, 'data', 'custom')),
       getDoc(doc(db, 'users', uid, 'data', 'goals')),
     ]);
-    sessions = {};
-    sessSnap.forEach(d => { sessions[d.id] = d.data(); });
-    invalidatePRCache();
-    currentSession = sessions[getTodayKey()] ? structuredClone(sessions[getTodayKey()]) : {exercises:[], notes:''};
-    document.getElementById('notes').value = currentSession.notes || '';
-    templates = tplSnap.exists() ? (tplSnap.data().list || []) : [];
-    customExercises = custSnap.exists() ? (custSnap.data().list || []) : [];
-    goals = goalsSnap.exists() ? goalsSnap.data() : {trainDays: 3};
-    // Catch up templates with records logged on another device
-    syncTemplatesWithBests();
-    setSyncStatus('synced', '✓ Synchronisiert');
-    setTimeout(() => setSyncStatus('', 'Bereit'), 2000);
-  } catch(e) {
-    setSyncStatus('error', '✗ Sync-Fehler');
-    console.error(e);
-  }
-}
-
-// Returns true on success, false on failure — errors are handled here so
-// callers (scheduleSave, finishTraining) never see a rejection.
-async function saveSession() {
-  if(!currentUser) return false;
-  setSyncStatus('syncing', '↑ Wird gespeichert…');
-  const key=getTodayKey();
-  try {
-    await setDoc(doc(db, 'users', currentUser.uid, 'sessions', key), currentSession);
-    sessions[key] = structuredClone(currentSession);
-    invalidatePRCache();
-    syncTemplatesWithBests(); // fire-and-forget, handles its own errors
-    setSyncStatus('synced', '✓ Gespeichert');
-    setTimeout(() => setSyncStatus('', 'Bereit'), 1500);
+    if(gen !== authGen) return false;
+    applySessions(sessSnap); applyTemplates(tplSnap); applyCustom(custSnap); applyGoals(goalsSnap);
+    currentKey = getTodayKey();
+    setCurrentSession(sessions[currentKey]);
+    setSyncStatus('synced', '✓ Synchronisiert', 2000);
     return true;
   } catch(e) {
-    console.error('saveSession failed', e);
-    setSyncStatus('error', '✗ Speichern fehlgeschlagen');
-    // Reset to neutral after a moment so the user can retry; the error is logged
-    setTimeout(() => setSyncStatus('', 'Bereit'), 3000);
+    console.error('loadAllData failed', e);
     return false;
   }
 }
 
-// Shared helper so all background data saves report failure consistently
-async function saveUserDoc(name, payload, label) {
-  if(!currentUser) return;
-  try { await setDoc(doc(db, 'users', currentUser.uid, 'data', name), payload); }
-  catch(e) {
-    console.error('save '+name+' failed', e);
-    setSyncStatus('error', '✗ '+label+' fehlgeschlagen');
-    setTimeout(()=>setSyncStatus('','Bereit'),3000);
-  }
+// Content fingerprint of a stored training/template — independent of key
+// order, number formatting and the UI-only `open` flag — to tell real changes
+// made elsewhere from echoes of what this tab already knows.
+const stamp = o => o && JSON.stringify([o.name, o.notes, cleanExercises(o.exercises).map(e => [e.name, e.sets])]);
+
+// ── LIVE SYNC ──
+// After the initial load, snapshot listeners stream changes made in other
+// tabs/devices into memory, so this tab never saves on top of stale data.
+// The first snapshot counts too: it may already hold changes made between the
+// initial reads and the subscription.
+// Every write is tagged with this tab's CLIENT_ID to tell its own echoes from
+// foreign changes (hasPendingWrites can't: tabs on one device share the cache).
+// ponytail: edits of the same training on two devices that are BOTH offline
+// stay last-write-wins; fixing that needs per-exercise docs or revision rules.
+const CLIENT_ID = Math.random().toString(36).slice(2);
+const foreign = d => d.data()?.writer !== CLIENT_ID;
+let unwatchers = [];
+function unwatch() { unwatchers.forEach(u => u()); unwatchers = []; }
+function watchRemote(uid) {
+  const gen = authGen;
+  const watch = (ref, onChange) => {
+    let first = true;
+    unwatchers.push(onSnapshot(ref, snap => {
+      if(gen === authGen) onChange(snap, first);
+      first = false;
+    }, e => console.error('live sync failed', e)));
+  };
+  watch(collection(db, 'users', uid, 'sessions'), (snap, first) => {
+    const known = stamp(sessions[currentKey]);
+    applySessions(snap);
+    // The first snapshot lists every doc as new, so it can't say what changed
+    if(!first && !snap.docChanges().some(c => c.type === 'removed' || foreign(c.doc))) return;
+    if(stamp(sessions[currentKey]) !== known) adoptRemoteSession();
+    refreshActivePage();
+  });
+  const watchDoc = (name, apply) => watch(doc(db, 'users', uid, 'data', name), snap => {
+    if(!foreign(snap)) return;
+    apply(snap); refreshActivePage();
+  });
+  watchDoc('templates', applyTemplates);
+  watchDoc('custom', applyCustom);
+  watchDoc('goals', applyGoals);
 }
-async function saveTemplates()       { return saveUserDoc('templates', {list: templates},        'Vorlagen speichern'); }
-async function saveCustomExercises() { return saveUserDoc('custom',    {list: customExercises}, 'Übungen speichern'); }
-async function saveGoals()           { return saveUserDoc('goals',     goals,                   'Ziele speichern'); }
+// Another device changed the open training: adopt it, unless this tab has
+// unsaved edits — then the user decides which version wins.
+function adoptRemoteSession() {
+  if(saveTimer && !confirm('Dieses Training wurde gerade auf einem anderen Gerät geändert.\n\nOK: Version vom anderen Gerät übernehmen\nAbbrechen: deine Änderungen behalten (überschreibt die andere Version)')) return;
+  setCurrentSession(sessions[currentKey]);
+  render();
+}
+// Re-render list pages after remote changes; editors keep their drafts
+function refreshActivePage() {
+  const page = document.querySelector('.page.active')?.id;
+  if(page === 'page-history') renderHistory();
+  else if(page === 'page-templates') renderTemplates();
+  else if(page === 'page-goals') renderGoals();
+  else if(page === 'page-progress') renderProgress();
+}
+
+// ── WRITES ──
+// Firestore applies a write to its (offline-persistent) local cache at once
+// but resolves the promise only when the server acknowledged it — offline it
+// stays pending until the connection is back. So local state is updated
+// first and the UI never waits for the ack; trackWrite only drives the sync
+// status and reports rejections. Resolves true/false, never rejects.
+let pendingWrites = 0;
+function trackWrite(write, label, doneMsg = '✓ Gespeichert') {
+  const gen = authGen;
+  pendingWrites++;
+  setSyncStatus('syncing', '↑ Wird gespeichert…');
+  return new Promise(res => res(write())).then(() => true, e => { console.error(label + ' fehlgeschlagen', e); return false; }).then(ok => {
+    pendingWrites--;
+    if(gen !== authGen) return ok;
+    if(!ok) setSyncStatus('error', '✗ ' + label + ' fehlgeschlagen', 3000);
+    // Newer edits still unsent or in flight: keep showing "pending"
+    else if(!pendingWrites && !saveTimer) setSyncStatus('synced', doneMsg, 1500);
+    return ok;
+  });
+}
+// Editors wait briefly for the ack, so an immediate rejection (rules, invalid
+// data) keeps the draft open for a retry. Still pending after that = queued
+// offline, syncs later. Resolves true (saved) | false (failed) | null (queued).
+const ACK_WAIT_MS = 2000;
+function settleWrite(tracked) {
+  if(!navigator.onLine) return Promise.resolve(null);
+  return Promise.race([tracked, new Promise(r => setTimeout(() => r(null), ACK_WAIT_MS))]);
+}
+
+// Saves the open training under the day it belongs to (currentKey, not "now":
+// a session left open past midnight must not land on the next day). The
+// snapshot is taken synchronously, so later edits are never mistaken as saved.
+function saveSession() {
+  cancelSave();
+  if(!activeUid) return Promise.resolve(false);
+  const key = currentKey, snap = structuredClone(currentSession);
+  sessions[key] = snap;
+  invalidatePRCache();
+  syncTemplatesWithBests();
+  return trackWrite(() => setDoc(doc(db, 'users', activeUid, 'sessions', key), {...snap, writer: CLIENT_ID}), 'Speichern');
+}
+function saveUserDoc(name, payload, label) {
+  if(!activeUid) return Promise.resolve(false);
+  return trackWrite(() => setDoc(doc(db, 'users', activeUid, 'data', name), {...payload, writer: CLIENT_ID}), label);
+}
+function saveTemplates()       { return saveUserDoc('templates', {list: templates},        'Vorlagen speichern'); }
+function saveCustomExercises() { return saveUserDoc('custom',    {list: customExercises}, 'Übungen speichern'); }
+function saveGoals()           { return saveUserDoc('goals',     goals,                   'Ziele speichern'); }
 function scheduleSave() {
-  if(saveTimer) clearTimeout(saveTimer);
+  lastEditAt = Date.now();
+  clearTimeout(saveTimer);
   saveTimer = setTimeout(saveSession, 1200);
 }
+function cancelSave() { clearTimeout(saveTimer); saveTimer = null; }
+// Push a pending autosave out now (app goes to background, logout, day change)
+function flushSave() { if(saveTimer) saveSession(); }
+// Replace the open training (dropping unsaved edits) and sync the notes field
+function setCurrentSession(s) {
+  cancelSave();
+  currentSession = structuredClone(s || {exercises:[], notes:''});
+  document.getElementById('notes').value = currentSession.notes || '';
+}
+
+// A training stays bound to the day it was started, so one running past
+// midnight stays in one piece. The next day starts once the app is resumed
+// on a later day and the training had no edits for ROLLOVER_IDLE_MS.
+const ROLLOVER_IDLE_MS = 2 * 60 * 60 * 1000;
+function rolloverIfNewDay() {
+  if(!activeUid || currentKey === getTodayKey() || Date.now() - lastEditAt < ROLLOVER_IDLE_MS) return;
+  flushSave(); // still saved under the old day
+  currentKey = getTodayKey();
+  setCurrentSession(sessions[currentKey]);
+  renderDateHeader();
+  render();
+}
+document.addEventListener('visibilitychange', () => {
+  // Hidden: save now instead of after the debounce — the app may get killed
+  if(document.visibilityState === 'hidden') flushSave();
+  else rolloverIfNewDay();
+});
 
 // Two-letter initials from the display name (first + last), else first email char
 function getInitials(user) {
@@ -304,52 +481,56 @@ function getInitials(user) {
 
 // ── UI INIT ──
 function initUI() {
-  const today = new Date();
   const userLabel = (currentUser.displayName||currentUser.email||'').split('@')[0];
   document.getElementById('user-name').textContent = userLabel;
   document.getElementById('profile-initials').textContent = getInitials(currentUser);
-  document.getElementById('datedisp').textContent = today.getDate();
-  document.getElementById('monthdisp').textContent = months[today.getMonth()] + ' ' + today.getFullYear();
+  renderDateHeader();
+  animateNextStats=true;
+  render();
+  staggerIn('exercise-list');
+}
+// Header date + weekday strip show the day the open training belongs to
+function renderDateHeader() {
+  const day = new Date(currentKey + 'T12:00:00');
+  document.getElementById('datedisp').textContent = day.getDate();
+  document.getElementById('monthdisp').textContent = months[day.getMonth()] + ' ' + day.getFullYear();
   const wdEl = document.getElementById('weekdays');
   wdEl.innerHTML = '';
-  const moDay = (today.getDay()+6)%7;
+  const moDay = (day.getDay()+6)%7;
   DAYS.forEach((d,i) => {
     const el = document.createElement('div');
     el.className = 'wd' + (i===moDay?' active':'');
     el.textContent = d;
     wdEl.appendChild(el);
   });
-  document.getElementById('notes').addEventListener('input', e => {
-    currentSession.notes = e.target.value;
-    scheduleSave();
-  });
-  // Delegated picker handlers — read data-name to avoid building JS strings from user input
-  const pickerHandlers=[
-    ['exercise-options',n=>window.addExercise(n)],
-    ['tpl-exercise-options',n=>window.addTplExercise(n)],
-    ['backlog-exercise-options',n=>window.addBacklogExercise(n)],
-  ];
-  pickerHandlers.forEach(([id,fn])=>{
-    const el=document.getElementById(id);
-    if(!el)return;
-    el.addEventListener('click',e=>{
-      const opt=e.target.closest('.exercise-option');
-      if(opt&&opt.dataset.name)fn(opt.dataset.name);
-    });
-  });
-  // Redraw the progress chart on rotation/resize while the progress page is visible
-  let resizeTimer=null;
-  window.addEventListener('resize',()=>{
-    if(resizeTimer)clearTimeout(resizeTimer);
-    resizeTimer=setTimeout(()=>{
-      const page=document.getElementById('page-progress');
-      if(page&&page.classList.contains('active'))window.renderProgressChart&&window.renderProgressChart();
-    },150);
-  });
-  animateNextStats=true;
-  render();
-  staggerIn('exercise-list');
 }
+
+// Permanent listeners are installed exactly once at module load — not per
+// login — so they never stack up across sign-out / sign-in.
+document.getElementById('notes').addEventListener('input', e => {
+  currentSession.notes = e.target.value;
+  scheduleSave();
+});
+// Delegated picker handlers — read data-name to avoid building JS strings from user input
+[
+  ['exercise-options',n=>window.addExercise(n)],
+  ['tpl-exercise-options',n=>window.addTplExercise(n)],
+  ['backlog-exercise-options',n=>window.addBacklogExercise(n)],
+].forEach(([id,fn])=>{
+  document.getElementById(id).addEventListener('click',e=>{
+    const opt=e.target.closest('.exercise-option');
+    if(opt&&opt.dataset.name)fn(opt.dataset.name);
+  });
+});
+// Redraw the progress chart on rotation/resize while the progress page is visible
+let resizeTimer=null;
+window.addEventListener('resize',()=>{
+  if(resizeTimer)clearTimeout(resizeTimer);
+  resizeTimer=setTimeout(()=>{
+    const page=document.getElementById('page-progress');
+    if(page&&page.classList.contains('active'))window.renderProgressChart&&window.renderProgressChart();
+  },150);
+});
 
 // ── PAGE NAV ──
 // Containers whose children get a staggered entrance on page entry
@@ -402,14 +583,14 @@ function findExerciseName(name){
 }
 // Adds a user-entered exercise to customExercises (case-insensitive, length-limited).
 // Returns the canonical name to use, or null if input was invalid.
-async function ensureCustomExercise(rawName){
+function ensureCustomExercise(rawName){
   const q=(rawName||'').trim();
   if(!q)return null;
   if(q.length>EXERCISE_NAME_MAX){alert('Übungsname ist zu lang (max. '+EXERCISE_NAME_MAX+' Zeichen).');return null;}
   const existing=findExerciseName(q);
   if(existing)return existing;
   customExercises.push(q);
-  await saveCustomExercises();
+  saveCustomExercises(); // background — never blocks adding the exercise
   return q;
 }
 
@@ -417,9 +598,9 @@ async function ensureCustomExercise(rawName){
 // is called per exercise on each render(), per option in the picker and on
 // every kg keystroke. The cache builds the map once per data state in a
 // single pass; sessions mutations must call invalidatePRCache().
-// Today is excluded (a PR is always measured against PAST sessions), so the
-// cache also tracks which day it was built for and rebuilds after midnight.
-let prCache=null, prCacheDay=null;
+// The open training (currentKey) is excluded — a PR is always measured
+// against OTHER sessions — so the cache also tracks which key it was built for.
+let prCache=null, prCacheKey=null;
 function invalidatePRCache(){prCache=null;}
 function buildPRCache(todayKey){
   const map=new Map(); // exact exercise name -> {kg, reps}
@@ -437,8 +618,7 @@ function buildPRCache(todayKey){
   return map;
 }
 function getExPR(name){
-  const today=getTodayKey();
-  if(!prCache||prCacheDay!==today){prCache=buildPRCache(today);prCacheDay=today;}
+  if(!prCache||prCacheKey!==currentKey){prCache=buildPRCache(currentKey);prCacheKey=currentKey;}
   return prCache.get(name)||null;
 }
 
@@ -508,7 +688,7 @@ function renderExerciseCard(ex,opts){
       const setKg=parseFloat(set.kg)||0,setReps=parseFloat(set.reps)||0;
       const sv=setKg*setReps;
       const isPR=isPRSet(i,setKg,setReps);
-      return `<tr${isPR?' class="pr-row"':''}><td style="color:var(--text-muted);font-family:'Space Grotesk',sans-serif;font-weight:600">${i+1}</td><td>${set.kg||'—'} kg</td><td>${set.reps||'—'}</td><td>${sv>0?Math.round(sv):'—'}</td></tr>`;
+      return `<tr${isPR?' class="pr-row"':''}><td style="color:var(--text-muted);font-family:'Space Grotesk',sans-serif;font-weight:600">${i+1}</td><td>${escapeHtml(set.kg||'—')} kg</td><td>${escapeHtml(set.reps||'—')}</td><td>${sv>0?Math.round(sv):'—'}</td></tr>`;
     }).join('');
     card.className='detail-ex-card'+(hasPRClass?' has-pr':'');
     const nameHtml=badgeHtml?`${escapeHtml(ex.name)} ${badgeHtml}`:escapeHtml(ex.name);
@@ -527,17 +707,18 @@ function renderExerciseCard(ex,opts){
     const isPR=isPRSet(si,sKg,sR);
     return `<tr>
       <td>${si+1}</td>
-      <td><input class="set-input${isPR?' pr-value':''}" type="number" min="0" max="${KG_MAX}" step="0.5" inputmode="decimal" value="${s.kg||''}" placeholder="kg" oninput="${updateFn}(${idx},${si},'kg',this)"></td>
-      <td><input class="set-input" type="number" min="0" max="${REPS_MAX}" step="1" inputmode="numeric" value="${s.reps||''}" placeholder="Wdh" oninput="${updateFn}(${idx},${si},'reps',this)"></td>
+      <td><input class="set-input${isPR?' pr-value':''}" type="number" min="0" max="${KG_MAX}" step="0.5" inputmode="decimal" value="${escapeHtml(s.kg)}" placeholder="kg" oninput="${updateFn}(${idx},${si},'kg',this)"></td>
+      <td><input class="set-input" type="number" min="0" max="${REPS_MAX}" step="1" inputmode="numeric" value="${escapeHtml(s.reps)}" placeholder="Wdh" oninput="${updateFn}(${idx},${si},'reps',this)"></td>
       <td class="set-vol">${sv>0?Math.round(sv):'—'}</td>
     </tr>`;
   }).join('');
   card.className='exercise-card'+(hasPRClass?' has-pr':'');
   if(draggable){card.draggable=true;card.dataset.idx=idx;}
   if(flashAnimation)card.classList.add('pr-flash');
-  const dragHandle=draggable?`<span class="drag-handle" onmousedown="event.stopPropagation()" ontouchstart="event.stopPropagation()">${ICONS.gripVertical}</span>`:'';
+  // No touchstart stopPropagation here: the touch-drag starter listens on document
+  const dragHandle=draggable?`<span class="drag-handle" onmousedown="event.stopPropagation()">${ICONS.gripVertical}</span>`:'';
   card.innerHTML=`
-    <div class="exercise-header" onclick="${toggleFn}(${idx})">
+    <div class="exercise-header" role="button" tabindex="0" aria-expanded="${!!ex.open}" onclick="${toggleFn}(${idx})">
       ${dragHandle}
       <div class="exercise-name">${escapeHtml(ex.name)}</div>${badgeHtml}
       <span class="exercise-toggle${ex.open?' open':''}">${ICONS.chevronDown}</span>
@@ -663,15 +844,11 @@ window.addSet = function(ei){currentSession.exercises[ei].sets.push({kg:'',reps:
 window.removeEx = function(ei){currentSession.exercises.splice(ei,1);scheduleSave();render();}
 
 // ── FINISH TRAINING ──
-window.finishTraining = async function(){
+window.finishTraining = function(){
   if(!currentSession.exercises.length)return;
-  // Force immediate save
-  if(saveTimer)clearTimeout(saveTimer);
-  // saveSession never throws — it reports failure via return value and has
-  // already set the error sync status, so just stop here on failure.
-  if(!await saveSession())return;
-  setSyncStatus('synced','✓ Training gespeichert!');
-  setTimeout(()=>setSyncStatus('','Bereit'),3000);
+  // Save immediately; the snapshot is taken before collapsing. Offline the
+  // write is queued, the UI does not wait for it (failures raise a toast).
+  saveSession().then(ok=>{if(ok)setSyncStatus('synced','✓ Training gespeichert!',3000);});
   // Collapse all exercises
   currentSession.exercises.forEach(ex=>ex.open=false);
   render();
@@ -679,9 +856,35 @@ window.finishTraining = async function(){
 };
 
 // ── SHARED MODAL HELPERS ──
-window.openModal = function(id){document.getElementById(id).classList.add('open');};
-window.closeModal = function(id){document.getElementById(id).classList.remove('open');};
+// Open modals form a stack: everything outside the top one is inert (neither
+// focusable nor clickable), Escape closes it and focus returns to the opener.
+const modalStack=[];
+function updateInert(){
+  const top=modalStack.length?document.getElementById(modalStack[modalStack.length-1].id):null;
+  [...document.body.children].forEach(el=>{el.inert=!!top&&el!==top;});
+}
+window.openModal = function(id){
+  const el=document.getElementById(id);
+  if(!el.classList.contains('open'))modalStack.push({id,opener:document.activeElement});
+  el.classList.add('open');
+  updateInert();
+  el.querySelector('.modal-close')?.focus({preventScroll:true});
+};
+window.closeModal = function(id){
+  document.getElementById(id).classList.remove('open');
+  const i=modalStack.findIndex(m=>m.id===id);
+  if(i<0)return;
+  const [m]=modalStack.splice(i,1);
+  updateInert();
+  m.opener?.focus?.({preventScroll:true});
+};
 window.closeModalOnOverlay = function(e,id){if(e.target===document.getElementById(id))window.closeModal(id);};
+function closeAllModals(){while(modalStack.length)window.closeModal(modalStack[modalStack.length-1].id);}
+document.addEventListener('keydown',e=>{
+  if(e.key==='Escape'&&modalStack.length){window.closeModal(modalStack[modalStack.length-1].id);return;}
+  // Clickable non-button elements (role="button") react to Enter/Space like real buttons
+  if((e.key==='Enter'||e.key===' ')&&e.target.getAttribute?.('role')==='button'){e.preventDefault();e.target.click();}
+});
 
 // ── EXERCISE MODAL ──
 window.openExerciseModal = function(){
@@ -720,7 +923,7 @@ function filterExercisePicker(cfg){
         const prText=pr?`PR: <span>${pr.kg}kg × ${pr.reps} Wdh</span>`:`<span style="color:var(--text-muted)">Noch kein Eintrag</span>`;
         prHtml=`<div class="exercise-option-pr">${prText}</div>`;
       }
-      html+=`<div class="exercise-option${isCustom?' custom':''}" data-name="${escapeHtml(e.name)}">
+      html+=`<div class="exercise-option${isCustom?' custom':''}" role="button" tabindex="0" data-name="${escapeHtml(e.name)}">
         <div class="exercise-option-name">${escapeHtml(e.name)}${badge}</div>${prHtml}
       </div>`;
     });
@@ -742,8 +945,8 @@ window.filterBacklogExercises = ()=>filterExercisePicker({
   matchMuscle:true,showPR:false,showCustomBadge:true,
   emptyText:'Keine Übung gefunden — oben als neue hinzufügen.',
 });
-window.addCustomExercise = async function(){
-  const name=await ensureCustomExercise(document.getElementById('search').value);
+window.addCustomExercise = function(){
+  const name=ensureCustomExercise(document.getElementById('search').value);
   if(!name)return;
   window.addExercise(name);
 };
@@ -778,6 +981,7 @@ function renderHistory(){
     const exNames=(s.exercises||[]).map(e=>`<span class="session-ex-pill">${escapeHtml(e.name)}</span>`).join('');
     const card=document.createElement('div');
     card.className='session-card';
+    card.setAttribute('role','button');card.tabIndex=0;
     card.onclick=()=>showDetail(key);
     card.innerHTML=`
       <div class="session-card-header">
@@ -854,46 +1058,27 @@ function showDetail(key){
 
 window.editSession = function(){
   if(!currentDetailKey||!sessions[currentDetailKey])return;
-  backlogKey=currentDetailKey;
-  backlogOriginalKey=currentDetailKey; // remember original date for potential date change
-  backlogSession=structuredClone(sessions[currentDetailKey]);
-  backlogSession.exercises.forEach(ex=>ex.open=true);
-  const d=new Date(currentDetailKey+'T12:00:00');
-  const dayIdx=(d.getDay()+6)%7;
-  document.getElementById('backlog-date-label').textContent=DAYS_FULL[dayIdx]+', '+d.getDate()+'. '+monthsFull[d.getMonth()]+' '+d.getFullYear();
-  document.getElementById('backlog-notes').value=backlogSession.notes||'';
-  document.getElementById('backlog-change-date').max=getTodayKey();
-  renderBacklogExercises();
-  window.showPage('backlog');
+  const draft=structuredClone(sessions[currentDetailKey]);
+  draft.exercises.forEach(ex=>ex.open=true);
+  // Original date remembered for a potential date change
+  openBacklog(currentDetailKey,currentDetailKey,draft);
 };
 
-window.deleteSession = async function(){
-  if(!currentDetailKey)return;
-  const d=new Date(currentDetailKey+'T12:00:00');
+window.deleteSession = function(){
+  if(!currentDetailKey||!activeUid)return;
+  const key=currentDetailKey;
+  const d=new Date(key+'T12:00:00');
   const dayIdx=(d.getDay()+6)%7;
   const label=DAYS_FULL[dayIdx]+', '+d.getDate()+'. '+monthsFull[d.getMonth()]+' '+d.getFullYear();
   if(!confirm('Training vom '+label+' wirklich löschen?'))return;
-  setSyncStatus('syncing','↑ Wird gelöscht…');
-  try{
-    await deleteDoc(doc(db,'users',currentUser.uid,'sessions',currentDetailKey));
-    delete sessions[currentDetailKey];
-    invalidatePRCache();
-    syncTemplatesWithBests();
-    // If deleting today's session, reset currentSession too
-    if(currentDetailKey===getTodayKey()){
-      currentSession={exercises:[],notes:''};
-      document.getElementById('notes').value='';
-      render();
-    }
-    setSyncStatus('synced','✓ Gelöscht');
-    setTimeout(()=>setSyncStatus('','Bereit'),2000);
-    currentDetailKey=null;
-    window.showPage('history');
-  }catch(e){
-    console.error('deleteSession failed', e);
-    setSyncStatus('error','✗ Löschen fehlgeschlagen');
-    setTimeout(()=>setSyncStatus('','Bereit'),3000);
-  }
+  trackWrite(()=>deleteDoc(doc(db,'users',activeUid,'sessions',key)),'Löschen','✓ Gelöscht');
+  delete sessions[key];
+  invalidatePRCache();
+  syncTemplatesWithBests();
+  // If deleting the open training, reset currentSession too
+  if(key===currentKey){setCurrentSession(null);render();}
+  currentDetailKey=null;
+  window.showPage('history');
 };
 
 // ── GOALS ──
@@ -948,9 +1133,9 @@ function renderGoals(){
     </div>`;
   renderWeekHistory();
 }
-window.changeGoal = async function(delta){
+window.changeGoal = function(delta){
   goals.trainDays=Math.max(1,Math.min(7,(goals.trainDays||3)+delta));
-  await saveGoals();renderGoals();
+  renderGoals();saveGoals();
 };
 function renderWeekHistory(){
   const today=new Date();
@@ -982,7 +1167,7 @@ function renderWeekHistory(){
 // history on every call, so it is idempotent and self-correcting (deleting
 // a record session lowers the template again). Persists only on change.
 // Must be called wherever `sessions` is mutated.
-async function syncTemplatesWithBests(){
+function syncTemplatesWithBests(){
   if(!templates.length)return;
   const bests=buildPRCache(null); // null = no day excluded, today counts
   let changed=false;
@@ -997,7 +1182,7 @@ async function syncTemplatesWithBests(){
       });
     });
   });
-  if(changed)await saveTemplates();
+  if(changed)saveTemplates();
 }
 
 function renderTemplates(){
@@ -1021,15 +1206,21 @@ function renderTemplates(){
     list.appendChild(card);
   });
 }
-window.deleteTemplate = async function(ti){
+window.deleteTemplate = function(ti){
   if(!confirm(`Vorlage "${templates[ti].name}" wirklich löschen?`))return;
-  templates.splice(ti,1);await saveTemplates();renderTemplates();
+  templates.splice(ti,1);renderTemplates();saveTemplates();
 };
 window.openTemplateEditor = function(ti){
-  if(ti===null){editingTemplate={id:Date.now(),name:'',exercises:[]};document.getElementById('tpl-editor-title').textContent='Neue Vorlage';document.getElementById('tpl-name-input').value='';}
-  else{editingTemplate=structuredClone(templates[ti]);editingTemplate._editIdx=ti;document.getElementById('tpl-editor-title').textContent='Vorlage bearbeiten';document.getElementById('tpl-name-input').value=editingTemplate.name;}
-  renderTplExList();window.openModal('tpl-editor-overlay');
+  showTemplateEditor(ti===null?{id:Date.now(),name:'',exercises:[]}:structuredClone(templates[ti]));
 };
+// Remembers the stored version, so a save can tell if it changed elsewhere meanwhile
+function showTemplateEditor(tpl){
+  editingTemplate=tpl;
+  tplSeen=stamp(templates.find(t=>t.id===tpl.id));
+  document.getElementById('tpl-editor-title').textContent=tplSeen?'Vorlage bearbeiten':'Neue Vorlage';
+  document.getElementById('tpl-name-input').value=tpl.name;
+  renderTplExList();window.openModal('tpl-editor-overlay');
+}
 function renderTplExList(){
   const list=document.getElementById('tpl-ex-list');list.innerHTML='';
   (editingTemplate.exercises||[]).forEach((ex,ei)=>{
@@ -1038,8 +1229,8 @@ function renderTplExList(){
       <div class="tpl-set-row">
         <div class="tpl-set-label">Satz ${si+1}</div>
         <div class="tpl-mini-inputs">
-          <input class="tpl-mini-input" type="number" min="0" max="${KG_MAX}" step="0.5" inputmode="decimal" value="${s.kg||''}" placeholder="kg" oninput="updateTplSet(${ei},${si},'kg',this)">
-          <input class="tpl-mini-input" type="number" min="0" max="${REPS_MAX}" step="1" inputmode="numeric" value="${s.reps||''}" placeholder="Wdh" oninput="updateTplSet(${ei},${si},'reps',this)">
+          <input class="tpl-mini-input" type="number" min="0" max="${KG_MAX}" step="0.5" inputmode="decimal" value="${escapeHtml(s.kg)}" placeholder="kg" oninput="updateTplSet(${ei},${si},'kg',this)">
+          <input class="tpl-mini-input" type="number" min="0" max="${REPS_MAX}" step="1" inputmode="numeric" value="${escapeHtml(s.reps)}" placeholder="Wdh" oninput="updateTplSet(${ei},${si},'reps',this)">
         </div>
       </div>`).join('');
     div.innerHTML=`
@@ -1060,18 +1251,44 @@ window.saveTemplate = async function(){
   const name=document.getElementById('tpl-name-input').value.trim();
   if(!name){alert('Bitte einen Namen eingeben.');return;}
   if(!editingTemplate.exercises.length){alert('Bitte mindestens eine Übung hinzufügen.');return;}
-  editingTemplate.name=name;
-  if(editingTemplate._editIdx!==undefined){templates[editingTemplate._editIdx]=editingTemplate;delete templates[editingTemplate._editIdx]._editIdx;}
-  else templates.push(editingTemplate);
-  await saveTemplates();editingTemplate=null;window.closeModal('tpl-editor-overlay');renderTemplates();
+  const gen=authGen,editor=editingTemplate,draft={...structuredClone(editor),name};
+  // Matched by id, not list index: the list may have changed on another device meanwhile
+  const old=templates.find(t=>t.id===draft.id);
+  if(stamp(old)!==tplSeen&&!confirm('Diese Vorlage wurde inzwischen auf einem anderen Gerät geändert oder gelöscht.\n\nOK: deine Version speichern (überschreibt die andere)\nAbbrechen: nicht speichern'))return;
+  templates=old?templates.map(t=>t===old?draft:t):[...templates,draft];
+  const tracked=saveTemplates();
+  // The sent version is the editor's new base, so saving again meanwhile (double
+  // tap, edits made while waiting) isn't taken for a change on another device
+  const seen=tplSeen;tplSeen=stamp(draft);
+  // Rejected — also later, after the editor was closed: undo the entry and
+  // put the draft back into the editor for a retry. If another template is
+  // being edited by then, the draft stays in the local list (until another
+  // device's version arrives) and goes out with the next save.
+  const recover=()=>{
+    const open=document.getElementById('tpl-editor-overlay').classList.contains('open');
+    if(gen!==authGen||open&&editingTemplate!==editor)return;
+    templates=old?templates.map(t=>t.id===draft.id?old:t):templates.filter(t=>t.id!==draft.id);
+    renderTemplates();
+    if(open)tplSeen=seen;
+    else showTemplateEditor(draft);
+  };
+  const ok=await settleWrite(tracked);
+  if(gen!==authGen)return;
+  if(ok===false)return recover();
+  if(ok===null)tracked.then(saved=>{if(!saved)recover();});
+  // Only close the editor this save came from, and only while it still shows
+  // what was saved — a newer editor or newer edits stay open
+  const shown={...editor,name:document.getElementById('tpl-name-input').value.trim()};
+  if(editingTemplate===editor&&stamp(shown)===stamp(draft)){editingTemplate=null;window.closeModal('tpl-editor-overlay');}
+  renderTemplates();
 };
 window.openTplExModal = function(){
   window.openModal('tpl-ex-modal-overlay');
   document.getElementById('tpl-search').value='';document.getElementById('tpl-custom-btn').classList.remove('visible');
   filterTplExercises();setTimeout(()=>document.getElementById('tpl-search').focus(),300);
 };
-window.addTplCustomExercise = async function(){
-  const name=await ensureCustomExercise(document.getElementById('tpl-search').value);
+window.addTplCustomExercise = function(){
+  const name=ensureCustomExercise(document.getElementById('tpl-search').value);
   if(!name)return;
   window.addTplExercise(name);
 };
@@ -1080,12 +1297,12 @@ window.addTplExercise = function(name){
   window.closeModal('tpl-ex-modal-overlay');renderTplExList();
 };
 window.openImportModal = function(ti){
-  importingTemplateId=ti;
+  importingTemplateId=templates[ti].id;
   document.getElementById('import-modal-title').textContent=`"${templates[ti].name}" importieren`;
   window.openModal('import-modal-overlay');
 };
 window.doImport = function(mode){
-  const tpl=templates[importingTemplateId];if(!tpl)return;
+  const tpl=templates.find(t=>t.id===importingTemplateId);if(!tpl)return;
   const newEx=tpl.exercises.map(e=>({name:e.name,open:true,sets:e.sets.map(s=>({kg:s.kg||'',reps:s.reps||''}))}));
   if(mode==='replace')currentSession.exercises=newEx;
   else currentSession.exercises=[...currentSession.exercises,...newEx];
@@ -1099,6 +1316,32 @@ window.doImport = function(mode){
 let backlogKey = null;
 let backlogOriginalKey = null; // tracks original date when editing, to delete old entry if date changes
 let backlogSession = {exercises:[], notes:''};
+let backlogSeen = {}; // stamps of the stored trainings the editor started from, by date
+let lostDrafts = {}; // by date: drafts rejected late while another training was open
+
+function openBacklog(key, originalKey, session, seen={}){
+  const lost=lostDrafts[key];
+  delete lostDrafts[key];
+  if(lost&&confirm('Dein letzter Entwurf für diesen Tag konnte nicht gespeichert werden.\n\nOK: Entwurf wiederherstellen\nAbbrechen: verwerfen')){originalKey=lost.from;session=lost.draft;seen=lost.seen;}
+  backlogOriginalKey=originalKey;
+  backlogSession=session;
+  backlogSeen={...seen};
+  if(originalKey&&!(originalKey in backlogSeen))backlogSeen[originalKey]=stamp(sessions[originalKey]);
+  setBacklogDate(key);
+  document.getElementById('backlog-notes').value=session.notes||'';
+  document.getElementById('backlog-change-date').max=getTodayKey();
+  renderBacklogExercises();
+  window.showPage('backlog');
+}
+// Remembers the stored version of a date when first shown, so a save can tell
+// if it changed elsewhere meanwhile
+function setBacklogDate(key){
+  backlogKey=key;
+  if(!(key in backlogSeen))backlogSeen[key]=stamp(sessions[key]);
+  const d=new Date(key+'T12:00:00');
+  const dayIdx=(d.getDay()+6)%7;
+  document.getElementById('backlog-date-label').textContent=DAYS_FULL[dayIdx]+', '+d.getDate()+'. '+monthsFull[d.getMonth()]+' '+d.getFullYear();
+}
 
 window.openBacklogDateModal = function(){
   const input = document.getElementById('backlog-date-input');
@@ -1112,16 +1355,9 @@ window.confirmBacklogDate = function(){
   if(!dateStr){alert('Bitte ein Datum auswählen.');return;}
   if(dateStr>getTodayKey()){alert('Datum darf nicht in der Zukunft liegen.');return;}
   window.closeModal('backlog-date-modal-overlay');
-  backlogKey = dateStr;
   // Track an existing entry so a later date change deletes the original instead of duplicating it
-  backlogOriginalKey = sessions[dateStr] ? dateStr : null;
-  backlogSession = sessions[dateStr] ? structuredClone(sessions[dateStr]) : {exercises:[], notes:''};
-  const d=new Date(dateStr+'T12:00:00');
-  const dayIdx=(d.getDay()+6)%7;
-  document.getElementById('backlog-date-label').textContent=DAYS_FULL[dayIdx]+', '+d.getDate()+'. '+monthsFull[d.getMonth()]+' '+d.getFullYear();
-  document.getElementById('backlog-notes').value=backlogSession.notes||'';
-  renderBacklogExercises();
-  window.showPage('backlog');
+  if(sessions[dateStr])openBacklog(dateStr,dateStr,structuredClone(sessions[dateStr]));
+  else openBacklog(dateStr,null,{exercises:[],notes:''});
 };
 
 window.cancelBacklog = function(){
@@ -1143,47 +1379,60 @@ window.changeBacklogDate = function(dateStr){
       return;
     }
   }
-  backlogKey=dateStr;
-  const d=new Date(dateStr+'T12:00:00');
-  const dayIdx=(d.getDay()+6)%7;
-  document.getElementById('backlog-date-label').textContent=DAYS_FULL[dayIdx]+', '+d.getDate()+'. '+monthsFull[d.getMonth()]+' '+d.getFullYear();
+  setBacklogDate(dateStr);
   document.getElementById('backlog-change-date').value='';
 };
 
 window.saveBacklog = async function(){
-  if(!backlogKey)return;
+  if(!backlogKey||!activeUid)return;
   if(!backlogSession.exercises.length){alert('Bitte mindestens eine Übung hinzufügen.');return;}
-  backlogSession.notes=document.getElementById('backlog-notes').value||'';
-  setSyncStatus('syncing','↑ Wird gespeichert…');
-  try{
-    // If date was changed during edit, delete the old entry
-    if(backlogOriginalKey&&backlogOriginalKey!==backlogKey){
-      await deleteDoc(doc(db,'users',currentUser.uid,'sessions',backlogOriginalKey));
-      delete sessions[backlogOriginalKey];
-      if(backlogOriginalKey===getTodayKey()){
-        currentSession={exercises:[],notes:''};
-        document.getElementById('notes').value='';
-      }
+  const notes=document.getElementById('backlog-notes');
+  backlogSession.notes=notes.value||'';
+  const gen=authGen,editor=backlogSession,seen=backlogSeen,from=backlogOriginalKey,to=backlogKey,draft=structuredClone(backlogSession);
+  const moved=from&&from!==to;
+  if([from,to].some(k=>k&&stamp(sessions[k])!==seen[k])&&!confirm('Dieses Training wurde inzwischen auf einem anderen Gerät geändert.\n\nOK: deine Version speichern (überschreibt die andere)\nAbbrechen: nicht speichern'))return;
+  // One atomic batch: a date change can never delete the original without
+  // also writing the target.
+  const batch=writeBatch(db);
+  batch.set(doc(db,'users',activeUid,'sessions',to),{...draft,writer:CLIENT_ID});
+  if(moved)batch.delete(doc(db,'users',activeUid,'sessions',from));
+  const tracked=trackWrite(()=>batch.commit(),'Speichern');
+  // The sent version is the editor's new base, so saving again meanwhile (double
+  // tap, edits made while waiting) isn't taken for a change on another device
+  backlogOriginalKey=to;backlogSeen={[to]:stamp(draft)};
+  // Rejected — also later, after the editor was closed
+  // ponytail: lost drafts live in memory only, a reload before a late rejection
+  // loses them (toast only); persist pending drafts if rejections become real.
+  const recover=()=>{
+    if(gen!==authGen)return;
+    // Still open: back to the base before this save
+    if(backlogSession===editor){backlogOriginalKey=from;backlogSeen={...backlogSeen,...seen};}
+    // Closed: the draft goes back into the editor for a retry
+    else if(!backlogKey)openBacklog(to,from,structuredClone(draft),seen);
+    // Another training is open: offered again when its date is opened
+    else{
+      lostDrafts[to]={from,draft:structuredClone(draft),seen};
+      const d=new Date(to+'T12:00:00');
+      setSyncStatus('error',`✗ Training vom ${d.getDate()}. ${monthsFull[d.getMonth()]} nicht gespeichert – öffne den Tag erneut für deinen Entwurf`,3000);
     }
-    await setDoc(doc(db,'users',currentUser.uid,'sessions',backlogKey),backlogSession);
-    sessions[backlogKey]=structuredClone(backlogSession);
-    invalidatePRCache();
-    syncTemplatesWithBests();
-    // If saving to today, update currentSession too
-    if(backlogKey===getTodayKey()){
-      currentSession=structuredClone(backlogSession);
-      document.getElementById('notes').value=currentSession.notes||'';
-    }
-    setSyncStatus('synced','✓ Gespeichert');
-    setTimeout(()=>setSyncStatus('','Bereit'),1500);
-    backlogKey=null;backlogOriginalKey=null;backlogSession={exercises:[],notes:''};
-    render();
-    window.showPage('history');
-  }catch(e){
-    console.error('saveBacklog failed', e);
-    setSyncStatus('error','✗ Speichern fehlgeschlagen');
-    setTimeout(()=>setSyncStatus('','Bereit'),3000);
-  }
+  };
+  const ok=await settleWrite(tracked);
+  if(gen!==authGen)return;
+  if(ok===false)return recover();
+  if(ok===null)tracked.then(saved=>{if(!saved)recover();});
+  if(moved)delete sessions[from];
+  sessions[to]=draft;
+  invalidatePRCache();
+  syncTemplatesWithBests();
+  // Keep the open training in sync when it was the source or target
+  if(to===currentKey)setCurrentSession(draft);
+  else if(moved&&from===currentKey)setCurrentSession(null);
+  render();
+  // Only close the editor this save came from, and only while it still shows
+  // what was saved — a newer editor or newer edits stay open
+  if(backlogSession!==editor||backlogKey!==to||stamp({...editor,notes:notes.value})!==stamp(draft))return;
+  backlogKey=null;backlogOriginalKey=null;backlogSession={exercises:[],notes:''};
+  window.showPage('history');
 };
 
 function renderBacklogExercises(){
@@ -1219,8 +1468,8 @@ window.openBacklogExModal=function(){
   filterBacklogExercises();
   setTimeout(()=>document.getElementById('backlog-search').focus(),300);
 };
-window.addBacklogCustomExercise=async function(){
-  const name=await ensureCustomExercise(document.getElementById('backlog-search').value);
+window.addBacklogCustomExercise=function(){
+  const name=ensureCustomExercise(document.getElementById('backlog-search').value);
   if(!name)return;
   window.addBacklogExercise(name);
 };
@@ -1386,6 +1635,7 @@ function renderHeatmapMonth(year,month,container,prDays,todayKey){
     const prSuffix=hasPR&&prNames&&prNames.length?' · PR ('+prNames.join(', ')+')':'';
     cell.title=day+'. '+months[month]+' '+year+(exCount?' — '+exCount+' Übungen'+prSuffix:' — kein Training');
     if(hasPR||exCount>0){
+      cell.setAttribute('role','button');cell.tabIndex=0;
       cell.addEventListener('click',()=>showDetail(key));
     }
     // Staggered cell entrance (month view only — the year view has 365+ cells)
@@ -1479,15 +1729,15 @@ window.renderProgressChart = function(){
   const name=document.getElementById('progress-ex-select').value;
   const emptyMsg=document.getElementById('progress-empty');
   const col=getChartColors();
+  if(!name){canvas.style.display='none';emptyMsg.style.display='block';return;}
+  // Show the canvas BEFORE measuring — a display:none canvas measures 0 × 0
+  canvas.style.display='block';emptyMsg.style.display='none';
   const dpr=window.devicePixelRatio||1;
   canvas.width=canvas.offsetWidth*dpr;
   canvas.height=canvas.offsetHeight*dpr;
   ctx.scale(dpr,dpr);
   const W=canvas.offsetWidth,H=canvas.offsetHeight;
   ctx.clearRect(0,0,W,H);
-
-  if(!name){canvas.style.display='none';emptyMsg.style.display='block';return;}
-  canvas.style.display='block';emptyMsg.style.display='none';
 
   // Gather data points
   const points=[];

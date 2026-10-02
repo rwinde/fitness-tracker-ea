@@ -151,6 +151,10 @@ html.standalone .app{padding-top:calc(env(safe-area-inset-top,47px) + 52px);padd
 .sync-bar.syncing{color:var(--gold);animation:syncPulse 1.2s ease-in-out infinite}
 .sync-bar.synced{color:var(--green)}
 .sync-bar.error{color:var(--red)}
+.sync-toast{display:none;position:fixed;left:50%;transform:translateX(-50%);bottom:calc(env(safe-area-inset-bottom,0px) + 92px);z-index:150;max-width:calc(100% - 32px);padding:10px var(--space-16);border:1px solid var(--red);border-radius:var(--radius-sm);background:var(--surface);color:var(--red);font-size:var(--text-size-sm);text-align:center;box-shadow:var(--shadow-lg)}
+.sync-toast.show{display:block}
+.load-error{text-align:center;padding:0 var(--space-16)}
+.load-error-actions{display:flex;gap:var(--space-8);justify-content:center;margin-top:var(--space-16)}
 /* WEEKDAYS */
 .weekrow{display:flex;gap:6px;margin-bottom:var(--space-16)}
 .wd{flex:1;height:46px;display:flex;align-items:center;justify-content:center;font-family:'Space Grotesk',sans-serif;font-size:var(--text-size-sm);font-weight:600;border:1px solid var(--border);border-radius:var(--radius-sm);color:var(--text-muted);background:var(--surface);transition:all 0.2s}

@@ -14,11 +14,13 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="styles.css?v=v2.9.0">
+<link rel="stylesheet" href="styles.css?v=v2.10.0">
 <script>
-var APP_VERSION='v2.9.0';
-// Legacy cleanup: unregister service workers from old app versions
-if('serviceWorker' in navigator){navigator.serviceWorker.getRegistrations().then(regs=>regs.forEach(r=>r.unregister()));}
+var APP_VERSION='v2.10.0';
+// App-shell service worker for offline restarts (sw.js). Registering it
+// replaces any legacy worker at this scope; workers of other apps on the
+// same origin stay untouched.
+if('serviceWorker' in navigator){navigator.serviceWorker.register('sw.js');}
 // Detect standalone mode reliably on iOS
 if(window.navigator.standalone===true||window.matchMedia('(display-mode:standalone)').matches){
   document.documentElement.classList.add('standalone');
@@ -207,11 +209,13 @@ if(document.readyState==='loading'){
   <button class="nav-btn" id="nav-history" onclick="showPage('history')"><span class="nav-icon"><span data-icon="history"></span></span>Verlauf</button>
 </div>
 
+<div class="sync-toast" id="sync-toast" role="alert"></div>
+
 <!-- MODALS -->
 <div class="modal-overlay" id="modal-overlay" onclick="closeModalOnOverlay(event,'modal-overlay')">
-  <div class="modal" onclick="event.stopPropagation()">
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="ex-modal-title" onclick="event.stopPropagation()">
     <button class="modal-close" onclick="closeModal('modal-overlay')" aria-label="Schließen"><span data-icon="x"></span></button>
-    <div class="modal-title">Übung wählen</div>
+    <div class="modal-title" id="ex-modal-title">Übung wählen</div>
     <div class="search-row">
       <input class="search-input" id="search" placeholder="Suchen oder eigene eingeben…" oninput="filterExercises()">
       <button class="custom-add-btn" id="custom-btn" onclick="addCustomExercise()">+ Neu</button>
@@ -221,7 +225,7 @@ if(document.readyState==='loading'){
 </div>
 
 <div class="modal-overlay" id="tpl-editor-overlay" onclick="closeModalOnOverlay(event,'tpl-editor-overlay')">
-  <div class="modal" onclick="event.stopPropagation()" style="max-height:88vh">
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="tpl-editor-title" onclick="event.stopPropagation()" style="max-height:88vh">
     <button class="modal-close" onclick="closeModal('tpl-editor-overlay')" aria-label="Schließen"><span data-icon="x"></span></button>
     <div class="modal-title" id="tpl-editor-title">Vorlage erstellen</div>
     <input class="tpl-input" id="tpl-name-input" maxlength="60" placeholder="Name (z.B. Push Day A)">
@@ -233,9 +237,9 @@ if(document.readyState==='loading'){
 </div>
 
 <div class="modal-overlay" id="tpl-ex-modal-overlay" onclick="closeModalOnOverlay(event,'tpl-ex-modal-overlay')">
-  <div class="modal" onclick="event.stopPropagation()">
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="tpl-ex-modal-title" onclick="event.stopPropagation()">
     <button class="modal-close" onclick="closeModal('tpl-ex-modal-overlay')" aria-label="Schließen"><span data-icon="x"></span></button>
-    <div class="modal-title">Übung wählen</div>
+    <div class="modal-title" id="tpl-ex-modal-title">Übung wählen</div>
     <div class="search-row">
       <input class="search-input" id="tpl-search" placeholder="Suchen…" oninput="filterTplExercises()">
       <button class="custom-add-btn" id="tpl-custom-btn" onclick="addTplCustomExercise()">+ Neu</button>
@@ -245,14 +249,14 @@ if(document.readyState==='loading'){
 </div>
 
 <div class="modal-overlay" id="import-modal-overlay" onclick="closeModalOnOverlay(event,'import-modal-overlay')">
-  <div class="modal" onclick="event.stopPropagation()">
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="import-modal-title" onclick="event.stopPropagation()">
     <button class="modal-close" onclick="closeModal('import-modal-overlay')" aria-label="Schließen"><span data-icon="x"></span></button>
     <div class="modal-title" id="import-modal-title">Vorlage importieren</div>
-    <div class="import-option" onclick="doImport('replace')">
+    <div class="import-option" role="button" tabindex="0" onclick="doImport('replace')">
       <div class="import-option-icon"><span data-icon="rotateCcw"></span></div>
       <div><div class="import-option-title">Ersetzen</div><div class="import-option-desc">Aktuelle Übungen löschen und durch Vorlage ersetzen</div></div>
     </div>
-    <div class="import-option" onclick="doImport('add')">
+    <div class="import-option" role="button" tabindex="0" onclick="doImport('add')">
       <div class="import-option-icon"><span data-icon="plus"></span></div>
       <div><div class="import-option-title">Hinzufügen</div><div class="import-option-desc">Vorlage zu bestehenden Übungen hinzufügen</div></div>
     </div>
@@ -260,9 +264,9 @@ if(document.readyState==='loading'){
 </div>
 
 <div class="modal-overlay" id="backlog-ex-modal-overlay" onclick="closeModalOnOverlay(event,'backlog-ex-modal-overlay')">
-  <div class="modal" onclick="event.stopPropagation()">
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="backlog-ex-modal-title" onclick="event.stopPropagation()">
     <button class="modal-close" onclick="closeModal('backlog-ex-modal-overlay')" aria-label="Schließen"><span data-icon="x"></span></button>
-    <div class="modal-title">Übung wählen</div>
+    <div class="modal-title" id="backlog-ex-modal-title">Übung wählen</div>
     <div class="search-row">
       <input class="search-input" id="backlog-search" placeholder="Suchen oder eigene eingeben…" oninput="filterBacklogExercises()">
       <button class="custom-add-btn" id="backlog-custom-btn" onclick="addBacklogCustomExercise()">+ Neu</button>
@@ -272,15 +276,15 @@ if(document.readyState==='loading'){
 </div>
 
 <div class="modal-overlay" id="backlog-date-modal-overlay" onclick="closeModalOnOverlay(event,'backlog-date-modal-overlay')">
-  <div class="modal" onclick="event.stopPropagation()">
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="backlog-date-modal-title" onclick="event.stopPropagation()">
     <button class="modal-close" onclick="closeModal('backlog-date-modal-overlay')" aria-label="Schließen"><span data-icon="x"></span></button>
-    <div class="modal-title" style="color:var(--gold-warm)"><span data-icon="calendar"></span> Vergangenes Training erfassen</div>
+    <div class="modal-title" id="backlog-date-modal-title" style="color:var(--gold-warm)"><span data-icon="calendar"></span> Vergangenes Training erfassen</div>
     <div style="font-size:15px;color:var(--text-secondary);margin-bottom:16px">Für welches Datum möchtest du ein Training eintragen?</div>
     <input type="date" id="backlog-date-input" style="width:100%;padding:14px 16px;background:var(--surface2);color:var(--text);border:1px solid var(--border);border-radius:var(--radius-sm);font-size:18px;font-family:'DM Sans',sans-serif;-webkit-appearance:none;appearance:none;outline:none;margin-bottom:16px">
     <button class="btn btn--warm btn--block" onclick="confirmBacklogDate()">Weiter</button>
   </div>
 </div>
 
-<script type="module" src="app.js?v=v2.9.0"></script>
+<script type="module" src="app.js?v=v2.10.0"></script>
 </body>
 </html>
