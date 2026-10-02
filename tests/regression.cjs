@@ -444,6 +444,95 @@ test('S3 a training rejected while another one is open comes back with its date'
   assert.equal(r.run('Object.keys(lostDrafts).length'), 0);
 });
 
+// Redesign v3: deletable sets, start options, copying earlier trainings
+test('V3 sets can be deleted; a new exercise starts like last time', async () => {
+  const srv = server();
+  srv.docs.set('users/A/sessions/2026-09-28', {exercises: [{name: 'Bankdrücken', sets: [{kg: '70', reps: '10'}, {kg: '70', reps: '10'}, {kg: '70', reps: '9'}]}], notes: ''});
+  srv.docs.set('users/A/sessions/2026-09-30', {exercises: [{name: 'Bankdrücken', sets: [{kg: '80', reps: '8'}, {kg: '82.5', reps: '6'}, {kg: '', reps: ''}]}], notes: ''});
+  const r = runtime(srv);
+  await r.login('A');
+  r.run("addExercise('Bankdrücken');addExercise('Neu');");
+  assert.equal(r.run('currentSession.exercises[0].sets.length'), 2); // last time's empty third set doesn't count
+  assert.equal(r.run('currentSession.exercises[1].sets.length'), 2); // never done before
+  const cards = r.nodes.get('exercise-list').children;
+  assert.match(cards[cards.length - 2].innerHTML, /placeholder="82.5"/); // last values as placeholders
+  r.run('addSet(0);addSet(0);removeSet(0,1);');
+  assert.equal(r.run('currentSession.exercises[0].sets.length'), 3);
+  r.run('removeSet(0,0);removeSet(0,0);removeSet(0,0);');
+  await r.run('saveSession()');
+  assert.equal(srv.docs.get(`users/A/sessions/${TODAY}`).exercises[0].sets.length, 0);
+  r.run("openTemplateEditor(null);addTplExercise('Bankdrücken');removeTplSet(0,0);");
+  assert.equal(r.run('editingTemplate.exercises[0].sets.length'), 1);
+  r.run("openBacklog('2026-09-29',null,{exercises:[],notes:''});addBacklogExercise('Bankdrücken');removeBacklogSet(0,0);");
+  assert.equal(r.run('backlogSession.exercises[0].sets.length'), 2); // before 09-30: like 09-28
+  assert.match(r.nodes.get('backlog-exercise-list').lastElementChild.innerHTML, /placeholder="70"/);
+});
+
+test('V3 templates and earlier trainings load into today with their values', async () => {
+  const srv = server();
+  srv.docs.set('users/A/sessions/2026-09-30', workout('Kniebeugen', '100'));
+  srv.docs.set('users/A/data/templates', {list: [{id: 1, name: 'Push', exercises: [{name: 'Bankdrücken', sets: [{kg: '80', reps: '8'}, {kg: '80', reps: '8'}]}]}]});
+  const r = runtime(srv);
+  await r.login('A');
+  // Empty day: the start panel offers the template and the last training
+  const panel = r.nodes.get('start-panel').innerHTML;
+  assert.match(panel, /startTemplate\(1\)/);
+  assert.match(panel, /copySessionToToday\('2026-09-30'\)/);
+  r.run('startTemplate(1)'); // empty day: taken directly
+  assert.equal(r.run('currentSession.exercises[0].sets[1].kg'), '80');
+  assert.equal(r.nodes.get('start-panel').style.display, 'none');
+  r.run("copySessionToToday('2026-09-30')"); // not empty: add or replace?
+  assert.ok(r.nodes.get('import-modal-overlay').classList.contains('open'));
+  r.run("doImport('add')");
+  assert.equal(r.run('JSON.stringify(currentSession.exercises.map(e=>e.name))'), '["Bankdrücken","Kniebeugen"]');
+  r.run("currentDetailKey='2026-09-30';copySession();doImport('replace');");
+  assert.equal(r.run('JSON.stringify(currentSession.exercises.map(e=>[e.name,e.sets[0].kg]))'), '[["Kniebeugen","100"]]');
+  // The copy is today's own training: editing it leaves the original alone
+  r.run("updateSet(0,0,'kg',{value:'105'})");
+  assert.equal(r.nodes.get('sync-bar').className, 'sync-bar syncing'); // unsaved edits never read as saved
+  assert.equal(r.run("sessions['2026-09-30'].exercises[0].sets[0].kg"), '100');
+  r.tick(); // autosave
+  assert.equal(srv.docs.get(`users/A/sessions/${TODAY}`).exercises[0].sets[0].kg, '105');
+  assert.equal(srv.docs.get('users/A/sessions/2026-09-30').exercises[0].sets[0].kg, '100');
+});
+
+test('V3 a template picker shown before a deletion elsewhere still loads the right template', async () => {
+  const srv = server();
+  srv.docs.set('users/A/data/templates', {list: [
+    {id: 1, name: 'Push', exercises: [{name: 'Bankdrücken', sets: [{kg: '80', reps: '8'}]}]},
+    {id: 2, name: 'Pull', exercises: [{name: 'Klimmzüge', sets: [{kg: '0', reps: '8'}]}]}]});
+  const a = runtime(srv), b = runtime(srv);
+  await a.login('A'); await b.login('A');
+  b.run('openLoadModal(false)');
+  const rows = b.nodes.get('load-options').innerHTML.match(/startTemplate\([^)]*\)/g);
+  a.run('deleteTemplate(0)'); // Push deleted on another device while b's picker is open
+  await new Promise(r => setImmediate(r));
+  assert.equal(b.run('templates.map(t=>t.name).join()'), 'Pull');
+  b.run(rows[0]); // the shown "Push" row must not load Pull
+  assert.equal(b.run('currentSession.exercises.length'), 0);
+  b.run(rows[1]);
+  assert.equal(b.run('currentSession.exercises[0].name'), 'Klimmzüge');
+});
+
+test('V3 notes without exercises stay reachable (today and history)', async () => {
+  const srv = server();
+  srv.docs.set('users/A/sessions/2026-09-29', {exercises: [], notes: 'Knie zwickt'});
+  srv.docs.set(`users/A/sessions/${TODAY}`, {...workout(), notes: 'Heute locker'});
+  const r = runtime(srv);
+  await r.login('A');
+  r.run('removeEx(0)');
+  assert.equal(r.nodes.get('training-panel').style.display, ''); // notes field still shown
+  assert.equal(r.nodes.get('start-panel').style.display, 'none');
+  r.tick(); // autosave
+  r.run("showPage('history')");
+  const cards = r.nodes.get('history-list').children.filter(c => c.className === 'card session-card');
+  assert.equal(cards.length, 2);
+  assert.ok(cards.every(c => c.innerHTML.includes('Nur Notiz')));
+  r.run("showDetail('2026-09-29')");
+  assert.ok(r.nodes.get('detail-notes-wrap').innerHTML.includes('Knie zwickt'));
+  assert.equal(r.nodes.get('detail-copy').style.display, 'none'); // nothing to copy
+});
+
 test('F12 the drag handle no longer swallows touchstart', () => {
   const r = runtime();
   r.put('fixture', workout());

@@ -59,30 +59,27 @@ function escapeHtml(s){return String(s==null?'':s).replace(/[&<>"']/g,c=>HTML_ES
 // NEVER interpolate user data into these strings.
 const ICON_ATTRS='class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"';
 const ICONS={
-  zap:`<svg ${ICON_ATTRS}><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>`,
   trophy:`<svg ${ICON_ATTRS}><path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6"/><path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18"/><path d="M4 22h16"/><path d="M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22"/><path d="M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22"/><path d="M18 2H6v7a6 6 0 0 0 12 0V2Z"/></svg>`,
-  dumbbell:`<svg ${ICON_ATTRS}><path d="M14.4 14.4 9.6 9.6"/><path d="M18.657 21.485a2 2 0 1 1-2.829-2.828l-1.767 1.768a2 2 0 1 1-2.829-2.829l6.364-6.364a2 2 0 1 1 2.829 2.829l1.767-1.768a2 2 0 1 1 2.828 2.829z"/><path d="m21.5 21.5-1.4-1.4"/><path d="M3.9 3.9 2.5 2.5"/><path d="M6.404 12.768a2 2 0 1 1-2.829-2.829l1.768-1.767a2 2 0 1 1-2.828-2.829l2.828-2.828a2 2 0 1 1 2.829 2.828l1.767-1.768a2 2 0 1 1 2.829 2.829z"/></svg>`,
   history:`<svg ${ICON_ATTRS}><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M12 7v5l4 2"/></svg>`,
   target:`<svg ${ICON_ATTRS}><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></svg>`,
   clipboardList:`<svg ${ICON_ATTRS}><rect width="8" height="4" x="8" y="2" rx="1" ry="1"/><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><path d="M12 11h4"/><path d="M12 16h4"/><path d="M8 11h.01"/><path d="M8 16h.01"/></svg>`,
   calendar:`<svg ${ICON_ATTRS}><path d="M8 2v4"/><path d="M16 2v4"/><rect width="18" height="18" x="3" y="4" rx="2"/><path d="M3 10h18"/></svg>`,
   check:`<svg ${ICON_ATTRS}><path d="M20 6 9 17l-5-5"/></svg>`,
-  checkCircle:`<svg ${ICON_ATTRS}><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><path d="m9 11 3 3L22 4"/></svg>`,
   play:`<svg ${ICON_ATTRS}><polygon points="6 3 20 12 6 21 6 3"/></svg>`,
   pencil:`<svg ${ICON_ATTRS}><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/><path d="m15 5 4 4"/></svg>`,
   x:`<svg ${ICON_ATTRS}><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>`,
-  sun:`<svg ${ICON_ATTRS}><circle cx="12" cy="12" r="4"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="m4.93 4.93 1.41 1.41"/><path d="m17.66 17.66 1.41 1.41"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="m6.34 17.66-1.41 1.41"/><path d="m19.07 4.93-1.41 1.41"/></svg>`,
-  moon:`<svg ${ICON_ATTRS}><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/></svg>`,
   gripVertical:`<svg ${ICON_ATTRS}><circle cx="9" cy="12" r="1"/><circle cx="9" cy="5" r="1"/><circle cx="9" cy="19" r="1"/><circle cx="15" cy="12" r="1"/><circle cx="15" cy="5" r="1"/><circle cx="15" cy="19" r="1"/></svg>`,
   chevronDown:`<svg ${ICON_ATTRS}><path d="m6 9 6 6 6-6"/></svg>`,
   chevronLeft:`<svg ${ICON_ATTRS}><path d="m15 18-6-6 6-6"/></svg>`,
   chevronRight:`<svg ${ICON_ATTRS}><path d="m9 18 6-6-6-6"/></svg>`,
-  arrowLeft:`<svg ${ICON_ATTRS}><path d="m12 19-7-7 7-7"/><path d="M19 12H5"/></svg>`,
   trash:`<svg ${ICON_ATTRS}><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/><line x1="10" x2="10" y1="11" y2="17"/><line x1="14" x2="14" y1="11" y2="17"/></svg>`,
-  trendingUp:`<svg ${ICON_ATTRS}><polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/><polyline points="16 7 22 7 22 13"/></svg>`,
   rotateCcw:`<svg ${ICON_ATTRS}><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>`,
   plus:`<svg ${ICON_ATTRS}><path d="M5 12h14"/><path d="M12 5v14"/></svg>`,
   logOut:`<svg ${ICON_ATTRS}><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" x2="9" y1="12" y2="12"/></svg>`,
+  home:`<svg ${ICON_ATTRS}><path d="M15 21v-8a1 1 0 0 0-1-1h-4a1 1 0 0 0-1 1v8"/><path d="M3 10a2 2 0 0 1 .709-1.528l7-5.999a2 2 0 0 1 2.582 0l7 5.999A2 2 0 0 1 21 10v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>`,
+  barChart:`<svg ${ICON_ATTRS}><path d="M3 3v16a2 2 0 0 0 2 2h16"/><path d="M18 17V9"/><path d="M13 17V5"/><path d="M8 17v-3"/></svg>`,
+  copy:`<svg ${ICON_ATTRS}><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg>`,
+  repeat:`<svg ${ICON_ATTRS}><path d="m17 2 4 4-4 4"/><path d="M3 11v-1a4 4 0 0 1 4-4h14"/><path d="m7 22-4-4 4-4"/><path d="M21 13v1a4 4 0 0 1-4 4H3"/></svg>`,
 };
 // Hydrate static markup: index.html carries <span data-icon="…"> placeholders so
 // every SVG lives only here in the registry. Runs at module init — the app
@@ -135,7 +132,7 @@ let currentSession = {exercises:[], notes:''};
 let currentKey = getTodayKey(); // day the open training belongs to
 let editingTemplate = null;
 let tplSeen; // stamp of the stored template the editor started from
-let importingTemplateId = null;
+let pendingImport = null; // exercises waiting for the add/replace choice
 let saveTimer = null;
 let lastEditAt = 0;
 let dragSrcIdx = null;
@@ -152,28 +149,24 @@ window.signInWithGoogle = async () => {
 };
 window.signOut = async () => { flushSave(); await fbSignOut(auth); };
 
-window.toggleTheme = function() {
-  const root = document.documentElement;
-  const goingLight = root.getAttribute('data-theme') !== 'light';
-  if (goingLight) root.setAttribute('data-theme', 'light');
-  else root.removeAttribute('data-theme');
-  try { localStorage.setItem('theme', goingLight ? 'light' : 'dark'); } catch(e) {}
-  updateThemeToggleIcon();
-  // The canvas chart reads its colors from CSS variables at draw time,
-  // so it must be redrawn when the theme changes while it is visible.
-  const progressPage = document.getElementById('page-progress');
-  if (progressPage && progressPage.classList.contains('active') && window.renderProgressChart) window.renderProgressChart();
-};
-function updateThemeToggleIcon() {
-  const isLight = document.documentElement.getAttribute('data-theme') === 'light';
-  const iconEl = document.getElementById('theme-toggle-icon');
-  const switchEl = document.getElementById('theme-switch');
-  const btn = document.getElementById('theme-toggle');
-  // Static ICONS markup only — safe for innerHTML
-  if (iconEl) iconEl.innerHTML = isLight ? ICONS.sun : ICONS.moon;
-  if (switchEl) switchEl.classList.toggle('on', !isLight); // switch on = Dark Mode active
-  if (btn) replayAnim(btn, 'spin');
+// Theme: 'auto' follows the system via the CSS media query, 'light'/'dark'
+// override it (data-theme). The head script applies a stored override before
+// the first paint; this keeps the menu in sync and redraws the canvas chart,
+// which reads its colors from CSS variables at draw time.
+function applyThemeMode(mode) {
+  if (mode === 'light' || mode === 'dark') document.documentElement.setAttribute('data-theme', mode);
+  else document.documentElement.removeAttribute('data-theme');
+  document.querySelectorAll('#theme-modes button').forEach(b => b.classList.toggle('active', b.dataset.mode === (mode || 'auto')));
+  redrawChartIfVisible();
 }
+window.setThemeMode = function(mode) {
+  try { localStorage.setItem('themeMode', mode); } catch(e) {}
+  applyThemeMode(mode);
+};
+function redrawChartIfVisible() {
+  if (document.getElementById('page-progress').classList.contains('active')) window.renderProgressChart();
+}
+window.matchMedia('(prefers-color-scheme: dark)').addEventListener?.('change', redrawChartIfVisible);
 window.toggleProfileMenu = function(e) {
   e.stopPropagation();
   const menu = document.getElementById('profile-menu');
@@ -191,13 +184,8 @@ document.addEventListener('click', (e) => {
     document.getElementById('profile-btn').setAttribute('aria-expanded', 'false');
   }
 });
-function applyStoredTheme() {
-  try {
-    if (localStorage.getItem('theme') === 'light') document.documentElement.setAttribute('data-theme', 'light');
-  } catch(e) { /* localStorage unavailable — Safari private mode etc. */ }
-  updateThemeToggleIcon();
-}
-applyStoredTheme();
+try { applyThemeMode(localStorage.getItem('themeMode')); }
+catch(e) { applyThemeMode('auto'); /* localStorage unavailable — Safari private mode etc. */ }
 
 onAuthStateChanged(auth, async (user) => {
   authGen++;
@@ -227,7 +215,7 @@ async function enterApp() {
   const ok = await loadAllData();
   if(gen !== authGen) return;
   if(!ok) {
-    loading.innerHTML = '<div class="load-error">Daten konnten nicht geladen werden.<div class="load-error-actions"><button class="btn btn--primary btn--sm" onclick="retryLoad()">Erneut versuchen</button><button class="btn btn--secondary btn--sm" onclick="signOut()">Abmelden</button></div></div>';
+    loading.innerHTML = '<div class="load-error">Daten konnten nicht geladen werden.<div class="load-error-actions"><button class="btn btn--primary btn--sm" onclick="retryLoad()">Erneut versuchen</button><button class="btn btn--sm" onclick="signOut()">Abmelden</button></div></div>';
     return;
   }
   activeUid = currentUser.uid;
@@ -251,7 +239,7 @@ function resetAccountState() {
   currentKey = getTodayKey(); lastEditAt = 0;
   sessions = {}; templates = []; customExercises = []; goals = {trainDays: 3};
   invalidatePRCache();
-  editingTemplate = null; importingTemplateId = null; currentDetailKey = null;
+  editingTemplate = null; pendingImport = null; currentDetailKey = null;
   backlogKey = null; backlogOriginalKey = null; backlogSession = {exercises:[], notes:''}; lostDrafts = {};
   closeAllModals();
   document.getElementById('profile-menu').classList.remove('open');
@@ -267,7 +255,7 @@ function setSyncStatus(status, msg, resetMs) {
   const bar = document.getElementById('sync-bar');
   bar.className = 'sync-bar ' + status;
   bar.textContent = msg;
-  if(resetMs) statusTimer = setTimeout(() => setSyncStatus('', 'Bereit'), resetMs);
+  if(resetMs) statusTimer = setTimeout(() => setSyncStatus('', 'Alles gesichert'), resetMs);
   if(status === 'error') {
     const toast = document.getElementById('sync-toast');
     toast.textContent = msg;
@@ -319,7 +307,7 @@ async function loadAllData() {
     applySessions(sessSnap); applyTemplates(tplSnap); applyCustom(custSnap); applyGoals(goalsSnap);
     currentKey = getTodayKey();
     setCurrentSession(sessions[currentKey]);
-    setSyncStatus('synced', '✓ Synchronisiert', 2000);
+    setSyncStatus('synced', 'Synchronisiert', 2000);
     return true;
   } catch(e) {
     console.error('loadAllData failed', e);
@@ -377,12 +365,13 @@ function adoptRemoteSession() {
   setCurrentSession(sessions[currentKey]);
   render();
 }
-// Re-render list pages after remote changes; editors keep their drafts
+// Re-render list pages after remote changes; editors keep their drafts and
+// an open training isn't re-rendered under the user's fingers
 function refreshActivePage() {
   const page = document.querySelector('.page.active')?.id;
-  if(page === 'page-history') renderHistory();
+  if(page === 'page-today' && !currentSession.exercises.length) render();
+  else if(page === 'page-history') renderHistory();
   else if(page === 'page-templates') renderTemplates();
-  else if(page === 'page-goals') renderGoals();
   else if(page === 'page-progress') renderProgress();
 }
 
@@ -393,14 +382,14 @@ function refreshActivePage() {
 // first and the UI never waits for the ack; trackWrite only drives the sync
 // status and reports rejections. Resolves true/false, never rejects.
 let pendingWrites = 0;
-function trackWrite(write, label, doneMsg = '✓ Gespeichert') {
+function trackWrite(write, label, doneMsg = 'Gespeichert') {
   const gen = authGen;
   pendingWrites++;
-  setSyncStatus('syncing', '↑ Wird gespeichert…');
+  setSyncStatus('syncing', navigator.onLine ? 'Wird gespeichert…' : 'Offline gesichert, wird später synchronisiert');
   return new Promise(res => res(write())).then(() => true, e => { console.error(label + ' fehlgeschlagen', e); return false; }).then(ok => {
     pendingWrites--;
     if(gen !== authGen) return ok;
-    if(!ok) setSyncStatus('error', '✗ ' + label + ' fehlgeschlagen', 3000);
+    if(!ok) setSyncStatus('error', label + ' fehlgeschlagen', 3000);
     // Newer edits still unsent or in flight: keep showing "pending"
     else if(!pendingWrites && !saveTimer) setSyncStatus('synced', doneMsg, 1500);
     return ok;
@@ -436,6 +425,7 @@ function saveCustomExercises() { return saveUserDoc('custom',    {list: customEx
 function saveGoals()           { return saveUserDoc('goals',     goals,                   'Ziele speichern'); }
 function scheduleSave() {
   lastEditAt = Date.now();
+  if(!saveTimer) setSyncStatus('syncing', 'Wird gesichert…');
   clearTimeout(saveTimer);
   saveTimer = setTimeout(saveSession, 1200);
 }
@@ -444,6 +434,7 @@ function cancelSave() { clearTimeout(saveTimer); saveTimer = null; }
 function flushSave() { if(saveTimer) saveSession(); }
 // Replace the open training (dropping unsaved edits) and sync the notes field
 function setCurrentSession(s) {
+  if(saveTimer && !pendingWrites) setSyncStatus('', 'Alles gesichert');
   cancelSave();
   currentSession = structuredClone(s || {exercises:[], notes:''});
   document.getElementById('notes').value = currentSession.notes || '';
@@ -489,20 +480,10 @@ function initUI() {
   render();
   staggerIn('exercise-list');
 }
-// Header date + weekday strip show the day the open training belongs to
+// The header date shows the day the open training belongs to
 function renderDateHeader() {
   const day = new Date(currentKey + 'T12:00:00');
-  document.getElementById('datedisp').textContent = day.getDate();
-  document.getElementById('monthdisp').textContent = months[day.getMonth()] + ' ' + day.getFullYear();
-  const wdEl = document.getElementById('weekdays');
-  wdEl.innerHTML = '';
-  const moDay = (day.getDay()+6)%7;
-  DAYS.forEach((d,i) => {
-    const el = document.createElement('div');
-    el.className = 'wd' + (i===moDay?' active':'');
-    el.textContent = d;
-    wdEl.appendChild(el);
-  });
+  document.getElementById('today-date').textContent = DAYS_FULL[(day.getDay()+6)%7] + ', ' + day.getDate() + '. ' + monthsFull[day.getMonth()];
 }
 
 // Permanent listeners are installed exactly once at module load — not per
@@ -526,32 +507,22 @@ document.getElementById('notes').addEventListener('input', e => {
 let resizeTimer=null;
 window.addEventListener('resize',()=>{
   if(resizeTimer)clearTimeout(resizeTimer);
-  resizeTimer=setTimeout(()=>{
-    const page=document.getElementById('page-progress');
-    if(page&&page.classList.contains('active'))window.renderProgressChart&&window.renderProgressChart();
-  },150);
+  resizeTimer=setTimeout(redrawChartIfVisible,150);
 });
 
 // ── PAGE NAV ──
 // Containers whose children get a staggered entrance on page entry
-const PAGE_STAGGER={today:['exercise-list'],history:['history-list'],templates:['template-list'],goals:['goals-content','week-history-list'],detail:['detail-exercises']};
+const PAGE_STAGGER={today:['exercise-list','start-panel'],history:['history-list'],templates:['template-list'],detail:['detail-exercises']};
 window.showPage = function(name) {
   document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
   document.querySelectorAll('.nav-btn').forEach(b=>b.classList.remove('active'));
   const page=document.getElementById('page-'+name);
   page.classList.add('active');
-  const navId = name==='detail'?'nav-history':('nav-'+name);
-  const navEl = document.getElementById(navId);
-  if(navEl) navEl.classList.add('active');
-  // Slide the gold indicator under the active tab
-  const ind=document.getElementById('nav-indicator');
-  if(ind&&navEl){
-    const idx=[...document.querySelectorAll('.nav-btn')].indexOf(navEl);
-    ind.style.transform='translateX('+(idx*100)+'%)';
-  }
+  const navId = name==='detail'||name==='backlog'?'nav-history':('nav-'+name);
+  document.getElementById(navId)?.classList.add('active');
+  if(name==='today') render();
   if(name==='history') renderHistory();
   if(name==='templates') renderTemplates();
-  if(name==='goals') renderGoals();
   if(name==='progress') renderProgress();
   if(!REDUCED_MOTION){
     replayAnim(page,'page-anim');
@@ -639,11 +610,7 @@ let animateNextStats=false;
 function updateStats(){
   const animate=animateNextStats&&!REDUCED_MOTION;
   animateNextStats=false;
-  let totalSets=0,totalVol=0;
-  currentSession.exercises.forEach(ex=>ex.sets.forEach(s=>{
-    const kg=parseFloat(s.kg)||0,r=parseFloat(s.reps)||0;
-    if(kg>0||r>0){totalSets++;totalVol+=kg*r;}
-  }));
+  const {sets:totalSets,vol:totalVol}=sessionTotals(currentSession);
   const fmt=n=>n.toLocaleString('de');
   [['stat-ex',currentSession.exercises.length],['stat-sets',totalSets],['stat-vol',Math.round(totalVol)]].forEach(([id,val])=>{
     const el=document.getElementById(id);
@@ -667,8 +634,25 @@ function renderEmpty(icon,title,sub){
   </div>`;
 }
 
+// Set rows (kg / reps / delete) shared by the training cards and the template
+// editor. ghost: last time's sets, shown as placeholders in empty fields.
+function setRows(sets,ei,updateFn,removeFn,isPRSet=()=>false,ghost=null){
+  const head=sets.length?'<div class="sets-head"><span></span><span>kg</span><span>Wdh</span><span></span></div>':'';
+  return head+sets.map((s,si)=>{
+    const sKg=parseFloat(s.kg)||0,sR=parseFloat(s.reps)||0,g=ghost?.[si]||{};
+    return `<div class="set-row">
+      <span class="set-no">${si+1}</span>
+      <input class="set-input${isPRSet(si,sKg,sR)?' pr-value':''}" type="number" min="0" max="${KG_MAX}" step="0.5" inputmode="decimal" value="${escapeHtml(s.kg)}" placeholder="${escapeHtml(g.kg||'')}" aria-label="Satz ${si+1} kg" oninput="${updateFn}(${ei},${si},'kg',this)">
+      <input class="set-input" type="number" min="0" max="${REPS_MAX}" step="1" inputmode="numeric" value="${escapeHtml(s.reps)}" placeholder="${escapeHtml(g.reps||'')}" aria-label="Satz ${si+1} Wiederholungen" oninput="${updateFn}(${ei},${si},'reps',this)">
+      <button class="set-del" onclick="${removeFn}(${ei},${si})" aria-label="Satz ${si+1} löschen">${ICONS.x}</button>
+    </div>`;
+  }).join('');
+}
+const setsLabel=n=>n+(n===1?' Satz':' Sätze');
+
 // Shared exercise-card renderer used by today / backlog / detail views.
-// opts: { idx, draggable, readonly, showDelete, namespace, badgeHtml, hasPRClass, flashAnimation, isPRSet }
+// opts: { idx, draggable, readonly, showDelete, namespace, badgeHtml, hasPRClass, flashAnimation, isPRSet, subOpen, ghost }
+// subOpen: header subline while expanded (static markup / numbers only)
 function renderExerciseCard(ex,opts){
   const {
     idx=0,
@@ -680,80 +664,71 @@ function renderExerciseCard(ex,opts){
     hasPRClass=false,
     flashAnimation=false,
     isPRSet=()=>false,
+    subOpen='',
+    ghost=null,
   }=opts||{};
-  const vol=ex.sets.reduce((sum,set)=>sum+(parseFloat(set.kg)||0)*(parseFloat(set.reps)||0),0);
+  const vol=Math.round(calcExVol(ex)).toLocaleString('de');
   const card=document.createElement('div');
   if(readonly){
+    // Sets left empty (planned, not done) are not shown
     const rows=ex.sets.map((set,i)=>{
+      if(!set.kg&&!set.reps)return '';
       const setKg=parseFloat(set.kg)||0,setReps=parseFloat(set.reps)||0;
       const sv=setKg*setReps;
-      const isPR=isPRSet(i,setKg,setReps);
-      return `<tr${isPR?' class="pr-row"':''}><td style="color:var(--text-muted);font-family:'Space Grotesk',sans-serif;font-weight:600">${i+1}</td><td>${escapeHtml(set.kg||'—')} kg</td><td>${escapeHtml(set.reps||'—')}</td><td>${sv>0?Math.round(sv):'—'}</td></tr>`;
+      return `<div class="ro-row${isPRSet(i,setKg,setReps)?' pr-row':''}"><span class="set-no">${i+1}</span><span>${escapeHtml(set.kg||'–')} kg</span><span>× ${escapeHtml(set.reps||'–')}</span><span class="ro-vol">${sv>0?Math.round(sv).toLocaleString('de'):'–'}</span></div>`;
     }).join('');
-    card.className='detail-ex-card'+(hasPRClass?' has-pr':'');
-    const nameHtml=badgeHtml?`${escapeHtml(ex.name)} ${badgeHtml}`:escapeHtml(ex.name);
-    card.innerHTML=`<div class="detail-ex-name">${nameHtml}</div>
-      <table class="detail-sets-table"><thead><tr><th>#</th><th>KG</th><th>Wdh</th><th>Vol</th></tr></thead><tbody>${rows}</tbody></table>
-      <div class="detail-ex-vol">Volumen: <span>${Math.round(vol).toLocaleString('de')} kg</span></div>`;
+    card.className='card detail-ex-card'+(hasPRClass?' has-pr':'');
+    card.innerHTML=`<div class="detail-ex-head"><div class="detail-ex-name">${escapeHtml(ex.name)}</div>${badgeHtml}</div>${rows}
+      <div class="detail-ex-vol">Volumen <b>${vol} kg</b></div>`;
     return card;
   }
-  const updateFn=namespace==='backlog'?'updateBacklogSet':'updateSet';
-  const toggleFn=namespace==='backlog'?'toggleBacklogEx':'toggleEx';
-  const addSetFn=namespace==='backlog'?'addBacklogSet':'addSet';
-  const removeFn=namespace==='backlog'?'removeBacklogEx':'removeEx';
-  const setsRows=ex.sets.map((s,si)=>{
-    const sKg=parseFloat(s.kg)||0,sR=parseFloat(s.reps)||0;
-    const sv=sKg*sR;
-    const isPR=isPRSet(si,sKg,sR);
-    return `<tr>
-      <td>${si+1}</td>
-      <td><input class="set-input${isPR?' pr-value':''}" type="number" min="0" max="${KG_MAX}" step="0.5" inputmode="decimal" value="${escapeHtml(s.kg)}" placeholder="kg" oninput="${updateFn}(${idx},${si},'kg',this)"></td>
-      <td><input class="set-input" type="number" min="0" max="${REPS_MAX}" step="1" inputmode="numeric" value="${escapeHtml(s.reps)}" placeholder="Wdh" oninput="${updateFn}(${idx},${si},'reps',this)"></td>
-      <td class="set-vol">${sv>0?Math.round(sv):'—'}</td>
-    </tr>`;
-  }).join('');
+  const fn=namespace==='backlog'
+    ?{update:'updateBacklogSet',toggle:'toggleBacklogEx',addSet:'addBacklogSet',removeSet:'removeBacklogSet',remove:'removeBacklogEx'}
+    :{update:'updateSet',toggle:'toggleEx',addSet:'addSet',removeSet:'removeSet',remove:'removeEx'};
   card.className='exercise-card'+(hasPRClass?' has-pr':'');
   if(draggable){card.draggable=true;card.dataset.idx=idx;}
   if(flashAnimation)card.classList.add('pr-flash');
   // No touchstart stopPropagation here: the touch-drag starter listens on document
   const dragHandle=draggable?`<span class="drag-handle" onmousedown="event.stopPropagation()">${ICONS.gripVertical}</span>`:'';
+  const sub=ex.open&&subOpen?subOpen:`${setsLabel(ex.sets.length)} · ${vol} kg`;
   card.innerHTML=`
-    <div class="exercise-header" role="button" tabindex="0" aria-expanded="${!!ex.open}" onclick="${toggleFn}(${idx})">
+    <div class="exercise-header" role="button" tabindex="0" aria-expanded="${!!ex.open}" onclick="${fn.toggle}(${idx})">
       ${dragHandle}
-      <div class="exercise-name">${escapeHtml(ex.name)}</div>${badgeHtml}
+      <div class="ex-title"><div class="exercise-name">${escapeHtml(ex.name)}</div><div class="ex-sub">${sub}</div></div>${badgeHtml}
       <span class="exercise-toggle${ex.open?' open':''}">${ICONS.chevronDown}</span>
     </div>
     ${ex.open?`<div class="exercise-body">
-      <table class="sets-table"><thead><tr><th>#</th><th>KG</th><th>Wdh</th><th>Vol</th></tr></thead><tbody>${setsRows}</tbody></table>
-      <button class="add-set-btn" onclick="${addSetFn}(${idx})">+ Satz hinzufügen</button>
-      <div class="exercise-footer">
-        <div><span class="vol-lbl">Volumen</span><span class="vol-val">${Math.round(vol).toLocaleString('de')} kg</span></div>
-      ${showDelete?`<button class="remove-ex" onclick="${removeFn}(${idx})">Entfernen</button>`:''}
-      </div>
+      ${setRows(ex.sets,idx,fn.update,fn.removeSet,isPRSet,ghost)}
+      <button class="add-set" onclick="${fn.addSet}(${idx})">+ Satz</button>
+      <div class="ex-foot"><span class="ex-vol">Volumen <b>${vol} kg</b></span>
+      ${showDelete?`<button class="ex-remove" onclick="${fn.remove}(${idx})">Übung entfernen</button>`:''}</div>
     </div>`:''}`;
   return card;
 }
 
 function render(){
+  // Notes alone keep the training view, so they stay reachable
+  const empty=!currentSession.exercises.length&&!currentSession.notes.trim();
+  document.getElementById('start-panel').style.display=empty?'':'none';
+  document.getElementById('training-panel').style.display=empty?'none':'';
+  if(empty)renderStartPanel();
   const list=document.getElementById('exercise-list');
   list.innerHTML='';
   currentSession.exercises.forEach((ex,ei)=>{
     const pr=getExPR(ex.name);
     const todayBest=getTodayBest(ei);
     const isNewPR=todayBest&&(!pr||todayBest.kg>pr.kg||(todayBest.kg===pr.kg&&todayBest.reps>pr.reps));
-    let badgeHtml;
-    if(isNewPR)badgeHtml=`<span class="pr-badge new-pr">${ICONS.trophy} Neuer PR!</span>`;
-    else if(pr)badgeHtml=`<span class="pr-badge has">PR: ${pr.kg}kg × ${pr.reps}</span>`;
-    else badgeHtml=`<span class="pr-badge none">Kein PR</span>`;
     const card=renderExerciseCard(ex,{
       idx:ei,
       draggable:true,
       showDelete:true,
       namespace:'today',
-      badgeHtml,
+      badgeHtml:isNewPR?`<span class="pr-chip">${ICONS.trophy} Neuer PR</span>`:'',
+      subOpen:pr?`Bestwert ${pr.kg} kg × ${pr.reps}`:'Noch kein Bestwert',
       hasPRClass:isNewPR,
       flashAnimation:isNewPR,
       isPRSet:(si,sKg,sR)=>sKg>0&&(!pr||sKg>pr.kg||(sKg===pr.kg&&sR>=pr.reps)),
+      ghost:lastSets(ex.name,currentKey),
     });
     // Drag & Drop
     card.addEventListener('dragstart',e=>{dragSrcIdx=ei;card.classList.add('dragging');e.dataTransfer.effectAllowed='move';});
@@ -771,10 +746,66 @@ function render(){
     });
     list.appendChild(card);
   });
-  if(!currentSession.exercises.length){
-    list.innerHTML=renderEmpty('dumbbell','Bereit zum Training?','Füge deine erste Übung hinzu<br>und leg los.');
-  }
   updateStats();
+}
+
+// ── START PANEL ──
+// "Mi, 1. Okt" for list rows
+function shortDate(key){const d=new Date(key+'T12:00:00');return DAYS[(d.getDay()+6)%7]+', '+d.getDate()+'. '+months[d.getMonth()];}
+// One-line preview of a training's exercises (escaped)
+const namesPreview=s=>escapeHtml(s.exercises.map(e=>e.name).join(', '));
+// Days with a training before `key`, newest first
+function trainedKeysBefore(key){return Object.keys(sessions).filter(k=>k<key&&sessions[k].exercises.length).sort().reverse();}
+// Last time's done sets of an exercise (most recent training before `key`
+// with values for it). A new exercise starts with as many sets, showing these
+// values as placeholders; never done before: two sets.
+function lastSets(name,key){
+  let best=null,bestKey='';
+  for(const k in sessions){
+    if(k>=key||k<=bestKey)continue;
+    const ex=sessions[k].exercises.find(e=>e.name===name);
+    const sets=ex?ex.sets.filter(s=>s.kg||s.reps):[];
+    if(sets.length){best=sets;bestKey=k;}
+  }
+  return best;
+}
+const emptySets=n=>Array.from({length:n},()=>({kg:'',reps:''}));
+function newSets(name,key){return emptySets(lastSets(name,key)?.length||2);}
+
+// Week progress towards the goal. full: with the goal stepper (Stats page);
+// otherwise compact and a shortcut to Stats.
+function weekCardHtml(full){
+  const weekDays=getWeekDays(getMondayOfWeek(new Date()));
+  const trained=countTrainedDays(weekDays),goal=goals.trainDays||3;
+  const pct=Math.min(100,Math.round(trained/goal*100));
+  const days=weekDays.map((k,i)=>{
+    const t=sessions[k]&&sessions[k].exercises.length>0;
+    return `<div class="wday${t?' done':''}${k===getTodayKey()?' today':''}"><i>${t?ICONS.check:''}</i>${DAYS[i]}</div>`;
+  }).join('');
+  return `<section class="card week-card"${full?'':' role="button" tabindex="0" onclick="showPage(\'progress\')"'}>
+    <div class="week-head"><span>${trained>=goal?'Wochenziel erreicht':'Diese Woche'}</span><span><b>${trained}</b> von ${goal} Trainings</span></div>
+    <div class="wdays">${days}</div>
+    <div class="bar"><i style="width:${pct}%"></i></div>
+    ${full?`<div class="goal-row"><span>Wochenziel</span><div class="stepper"><button onclick="changeGoal(-1)" aria-label="Ziel verringern">−</button><b>${goal}</b><button onclick="changeGoal(1)" aria-label="Ziel erhöhen">+</button></div></div>`:''}
+  </section>`;
+}
+
+// Empty day: week progress and the ways to start — a template, a copy of an
+// earlier training, or empty
+function renderStartPanel(){
+  const past=trainedKeysBefore(currentKey);
+  const row=(icon,title,sub,onclick)=>`<button class="list-row" onclick="${onclick}"><span class="list-ico">${ICONS[icon]}</span><span class="list-main"><span class="list-title">${title}</span><span class="list-sub">${sub}</span></span><span class="chev">${ICONS.chevronRight}</span></button>`;
+  const tiles=templates.map(t=>`<button class="tpl-tile" onclick="startTemplate(${tplRef(t)})"><span class="tpl-tile-play">${ICONS.play}</span><span class="tpl-tile-name">${escapeHtml(t.name)}</span><span class="tpl-tile-meta">${t.exercises.length} Übungen</span></button>`).join('');
+  // Date keys are validated (DATE_KEY), safe inside the handler
+  document.getElementById('start-panel').innerHTML=`${weekCardHtml(false)}
+    <div class="sec-label">Training starten</div>
+    ${tiles?`<div class="tpl-grid">${tiles}</div>`:''}
+    <div class="card list">
+      ${past.length?row('repeat','Letztes Training wiederholen',shortDate(past[0])+' · '+namesPreview(sessions[past[0]]),`copySessionToToday('${past[0]}')`):''}
+      ${past.length?row('copy','Aus dem Verlauf kopieren','Ein früheres Training als Basis','openLoadModal(true)'):''}
+      ${row('plus','Leer starten','Übungen einzeln hinzufügen','openExerciseModal()')}
+    </div>
+    <button class="link-btn" onclick="openBacklogDateModal()">${ICONS.calendar} Vergangenes Training nachtragen</button>`;
 }
 
 // Touch-based drag & drop for mobile
@@ -818,29 +849,24 @@ window.toggleEx = function(i){currentSession.exercises[i].open=!currentSession.e
 window.updateSet = function(ei,si,field,input){
   const val=clampSetValue(field, input.value);
   if(val!==input.value)input.value=val;
-  const setObj=currentSession.exercises[ei].sets[si];
+  const ex=currentSession.exercises[ei],setObj=ex.sets[si];
   setObj[field]=val;
   scheduleSave();updateStats();
-  const sv=(parseFloat(setObj.kg)||0)*(parseFloat(setObj.reps)||0);
-  const cards=document.querySelectorAll('#exercise-list .exercise-card');
-  if(cards[ei]){
-    const rows=cards[ei].querySelectorAll('tbody tr');
-    if(rows[si]){
-      rows[si].querySelector('.set-vol').textContent=sv>0?Math.round(sv):'—';
-      if(field==='kg'){
-        const pr=getExPR(currentSession.exercises[ei].name);
-        const kg=parseFloat(val)||0,reps=parseFloat(setObj.reps)||0;
-        const isPR=kg>0&&(!pr||kg>pr.kg||(kg===pr.kg&&reps>=pr.reps));
-        const kgInput=rows[si].querySelectorAll('.set-input')[0];
-        const hadPR=kgInput.classList.contains('pr-value');
-        kgInput.className='set-input'+(isPR?' pr-value':'');
-        // Gold burst the moment a set first crosses the PR threshold
-        if(isPR&&!hadPR&&!REDUCED_MOTION)replayAnim(cards[ei],'pr-burst');
-      }
-    }
+  const card=document.querySelectorAll('#exercise-list .exercise-card')[ei];
+  if(!card)return;
+  card.querySelector('.ex-vol b').textContent=Math.round(calcExVol(ex)).toLocaleString('de')+' kg';
+  if(field==='kg'){
+    const pr=getExPR(ex.name);
+    const kg=parseFloat(val)||0,reps=parseFloat(setObj.reps)||0;
+    const isPR=kg>0&&(!pr||kg>pr.kg||(kg===pr.kg&&reps>=pr.reps));
+    const hadPR=input.classList.contains('pr-value');
+    input.classList.toggle('pr-value',isPR);
+    // Burst the moment a set first crosses the PR threshold
+    if(isPR&&!hadPR&&!REDUCED_MOTION)replayAnim(card,'pr-burst');
   }
 };
 window.addSet = function(ei){currentSession.exercises[ei].sets.push({kg:'',reps:''});scheduleSave();render();}
+window.removeSet = function(ei,si){currentSession.exercises[ei].sets.splice(si,1);scheduleSave();render();}
 window.removeEx = function(ei){currentSession.exercises.splice(ei,1);scheduleSave();render();}
 
 // ── FINISH TRAINING ──
@@ -848,7 +874,7 @@ window.finishTraining = function(){
   if(!currentSession.exercises.length)return;
   // Save immediately; the snapshot is taken before collapsing. Offline the
   // write is queued, the UI does not wait for it (failures raise a toast).
-  saveSession().then(ok=>{if(ok)setSyncStatus('synced','✓ Training gespeichert!',3000);});
+  saveSession().then(ok=>{if(ok)setSyncStatus('synced','Training gespeichert',3000);});
   // Collapse all exercises
   currentSession.exercises.forEach(ex=>ex.open=false);
   render();
@@ -916,11 +942,11 @@ function filterExercisePicker(cfg){
     if(showLabels)html+=`<div class="muscle-label">${muscle}</div>`;
     exs.forEach(e=>{
       const isCustom=cfg.showCustomBadge&&e.muscle==='Eigene';
-      const badge=isCustom?' <span style="font-size:11px;color:var(--accent)">✓ eigene</span>':'';
+      const badge=isCustom?'<span class="custom-badge">eigene</span>':'';
       let prHtml='';
       if(cfg.showPR){
         const pr=getExPR(e.name);
-        const prText=pr?`PR: <span>${pr.kg}kg × ${pr.reps} Wdh</span>`:`<span style="color:var(--text-muted)">Noch kein Eintrag</span>`;
+        const prText=pr?`Bestwert <span>${pr.kg} kg × ${pr.reps}</span>`:'Noch kein Eintrag';
         prHtml=`<div class="exercise-option-pr">${prText}</div>`;
       }
       html+=`<div class="exercise-option${isCustom?' custom':''}" role="button" tabindex="0" data-name="${escapeHtml(e.name)}">
@@ -951,51 +977,45 @@ window.addCustomExercise = function(){
   window.addExercise(name);
 };
 window.addExercise = function(name){
-  currentSession.exercises.push({name,open:true,sets:[{kg:'',reps:''},{kg:'',reps:''},{kg:'',reps:''}]});
+  currentSession.exercises.push({name,open:true,sets:newSets(name,currentKey)});
   scheduleSave();render();window.closeModal('modal-overlay');
   popInLast('exercise-list');
 };
 
 // ── HISTORY ──
+// Done sets (any value entered) and volume of a training
+function sessionTotals(s){
+  let sets=0,vol=0;
+  s.exercises.forEach(ex=>ex.sets.forEach(set=>{
+    const kg=parseFloat(set.kg)||0,r=parseFloat(set.reps)||0;
+    if(kg>0||r>0){sets++;vol+=kg*r;}
+  }));
+  return {sets,vol};
+}
 function renderHistory(){
   const list=document.getElementById('history-list');
-  const keys=Object.keys(sessions).filter(k=>{
-    if(k===getTodayKey()){
-      // Show today in history only if it has exercises (training was done)
-      const s=sessions[k];
-      return s&&s.exercises&&s.exercises.length>0;
-    }
-    return true;
-  }).sort((a,b)=>b.localeCompare(a));
-  if(!keys.length){list.innerHTML=renderEmpty('history','Noch keine vergangenen Trainings','Trag heute dein erstes Training ein!');return;}
+  const keys=Object.keys(sessions).filter(k=>sessions[k].exercises.length||sessions[k].notes.trim()).sort().reverse();
+  if(!keys.length){list.innerHTML=renderEmpty('history','Noch keine Trainings','Dein erstes Training erscheint hier.');return;}
   list.innerHTML='';
+  let month='';
   keys.forEach(key=>{
     const s=sessions[key];
     const d=new Date(key+'T12:00:00');
-    const dayIdx=(d.getDay()+6)%7;
-    let totalSets=0,totalVol=0;
-    (s.exercises||[]).forEach(ex=>ex.sets.forEach(set=>{
-      const kg=parseFloat(set.kg)||0,r=parseFloat(set.reps)||0;
-      if(kg>0||r>0){totalSets++;totalVol+=kg*r;}
-    }));
-    const exNames=(s.exercises||[]).map(e=>`<span class="session-ex-pill">${escapeHtml(e.name)}</span>`).join('');
+    const m=monthsFull[d.getMonth()]+' '+d.getFullYear();
+    if(m!==month){
+      month=m;
+      const label=document.createElement('div');
+      label.className='month-label';label.textContent=m;
+      list.appendChild(label);
+    }
+    const {sets,vol}=sessionTotals(s);
     const card=document.createElement('div');
-    card.className='session-card';
+    card.className='card session-card';
     card.setAttribute('role','button');card.tabIndex=0;
     card.onclick=()=>showDetail(key);
-    card.innerHTML=`
-      <div class="session-card-header">
-        <div class="session-date-big">${d.getDate()}</div>
-        <div class="session-date-info">
-          <div class="session-weekday">${DAYS_FULL[dayIdx]}</div>
-          <div class="session-month">${d.getDate()}.${d.getMonth()+1}.${d.getFullYear()} · ${months[d.getMonth()]} ${d.getFullYear()}</div>
-        </div>
-        <div class="session-stats">
-          <div><div class="session-stat-num">${(s.exercises||[]).length}</div><div class="session-stat-lbl">Übungen</div></div>
-          <div><div class="session-stat-num">${Math.round(totalVol/1000*10)/10}t</div><div class="session-stat-lbl">Volumen</div></div>
-        </div>
-      </div>
-      ${exNames?`<div class="session-exercises-preview">${exNames}</div>`:''}`;
+    card.innerHTML=`<div class="session-date"><b>${d.getDate()}</b><span>${DAYS[(d.getDay()+6)%7]}</span></div>
+      <div class="session-main"><div class="session-names">${s.exercises.length?namesPreview(s):'Nur Notiz'}</div><div class="session-meta">${s.exercises.length} Übungen · ${setsLabel(sets)} · ${Math.round(vol).toLocaleString('de')} kg</div></div>
+      <span class="chev">${ICONS.chevronRight}</span>`;
     list.appendChild(card);
   });
 }
@@ -1007,20 +1027,16 @@ function showDetail(key){
   const s=sessions[key];if(!s)return;
   const d=new Date(key+'T12:00:00');
   const dayIdx=(d.getDay()+6)%7;
-  document.getElementById('detail-title').textContent=DAYS_FULL[dayIdx]+', '+d.getDate()+'. '+monthsFull[d.getMonth()]+' '+d.getFullYear();
-  let totalSets=0,totalVol=0;
-  (s.exercises||[]).forEach(ex=>ex.sets.forEach(set=>{
-    const kg=parseFloat(set.kg)||0,r=parseFloat(set.reps)||0;
-    if(kg>0||r>0){totalSets++;totalVol+=kg*r;}
-  }));
-  document.getElementById('detail-sub').textContent=(s.exercises||[]).length+' Übungen · '+totalSets+' Sätze · '+Math.round(totalVol).toLocaleString('de')+' kg';
-  document.getElementById('detail-stats').innerHTML=`
-    <div class="stat-card"><div class="stat-num">${(s.exercises||[]).length}</div><div class="stat-lbl">Übungen</div></div>
-    <div class="stat-card"><div class="stat-num">${totalSets}</div><div class="stat-lbl">Sätze</div></div>
-    <div class="stat-card"><div class="stat-num">${Math.round(totalVol).toLocaleString('de')}</div><div class="stat-lbl">kg Total</div></div>`;
+  document.getElementById('detail-sub').textContent=DAYS_FULL[dayIdx];
+  document.getElementById('detail-title').textContent=d.getDate()+'. '+monthsFull[d.getMonth()]+' '+d.getFullYear();
+  // Copying the open training onto itself makes no sense
+  document.getElementById('detail-copy').style.display=key===currentKey||!s.exercises.length?'none':'';
+  const {sets:totalSets,vol:totalVol}=sessionTotals(s);
+  const vals=[s.exercises.length,totalSets,Math.round(totalVol)];
+  document.getElementById('detail-stats').innerHTML=['Übungen','Sätze','kg Volumen']
+    .map((label,i)=>`<div class="summary-item"><b>${vals[i].toLocaleString('de')}</b><span>${label}</span></div>`).join('');
   if(!REDUCED_MOTION){
-    const vals=[(s.exercises||[]).length,totalSets,Math.round(totalVol)];
-    document.querySelectorAll('#detail-stats .stat-num').forEach((el,i)=>{el.dataset.val=0;countUp(el,vals[i],n=>n.toLocaleString('de'));});
+    document.querySelectorAll('#detail-stats b').forEach((el,i)=>{el.dataset.val=0;countUp(el,vals[i],n=>n.toLocaleString('de'));});
   }
   const exEl=document.getElementById('detail-exercises');exEl.innerHTML='';
   const standingPRs=getStandingPRs();
@@ -1046,16 +1062,17 @@ function showDetail(key){
     const showExPRBadge=matchCount===1;
     const card=renderExerciseCard(ex,{
       readonly:true,
-      badgeHtml:showExPRBadge?`<span class="pr-badge new-pr">${ICONS.trophy} PR</span>`:'',
+      badgeHtml:showExPRBadge?`<span class="pr-chip">${ICONS.trophy} PR</span>`:'',
       hasPRClass:showExPRBadge,
       isPRSet:i=>i===firstMatchIndex,
     });
     exEl.appendChild(card);
   });
-  document.getElementById('detail-notes-wrap').innerHTML=s.notes&&s.notes.trim()?`<div class="sec-label">Notizen</div><div class="detail-notes">${escapeHtml(s.notes)}</div>`:'';
+  document.getElementById('detail-notes-wrap').innerHTML=s.notes&&s.notes.trim()?`<div class="sec-label">Notizen</div><div class="card detail-notes">${escapeHtml(s.notes)}</div>`:'';
   window.showPage('detail');
 }
 
+window.copySession = function(){if(currentDetailKey)window.copySessionToToday(currentDetailKey);};
 window.editSession = function(){
   if(!currentDetailKey||!sessions[currentDetailKey])return;
   const draft=structuredClone(sessions[currentDetailKey]);
@@ -1071,7 +1088,7 @@ window.deleteSession = function(){
   const dayIdx=(d.getDay()+6)%7;
   const label=DAYS_FULL[dayIdx]+', '+d.getDate()+'. '+monthsFull[d.getMonth()]+' '+d.getFullYear();
   if(!confirm('Training vom '+label+' wirklich löschen?'))return;
-  trackWrite(()=>deleteDoc(doc(db,'users',activeUid,'sessions',key)),'Löschen','✓ Gelöscht');
+  trackWrite(()=>deleteDoc(doc(db,'users',activeUid,'sessions',key)),'Löschen','Gelöscht');
   delete sessions[key];
   invalidatePRCache();
   syncTemplatesWithBests();
@@ -1095,42 +1112,7 @@ function countTrainedDays(weekDays){
   return weekDays.filter(k=>{const s=sessions[k];return s&&s.exercises&&s.exercises.length>0;}).length;
 }
 function renderGoals(){
-  const today=new Date();
-  const monday=getMondayOfWeek(today);const weekDays=getWeekDays(monday);
-  const trained=countTrainedDays(weekDays);const goal=goals.trainDays||3;
-  const pct=Math.min(100,Math.round((trained/goal)*100));const done=trained>=goal;
-  const weekDotsHtml=weekDays.map((k,i)=>{
-    const t=sessions[k]&&sessions[k].exercises&&sessions[k].exercises.length>0;
-    const isToday=k===getTodayKey();
-    return `<div style="flex:1;text-align:center"><div class="week-dot${t?' trained':''}${isToday?' today':''}" style="margin:0 auto;width:100%;max-width:38px">${DAYS[i]}</div></div>`;
-  }).join('');
-  document.getElementById('goals-content').innerHTML=`
-    <div class="week-goal-card">
-      <div class="week-goal-header">
-        <div class="week-goal-icon">${ICONS.zap}</div>
-        <div class="week-goal-info">
-          <div class="week-goal-title">Trainingstage diese Woche</div>
-          <div class="week-goal-sub">${done?ICONS.checkCircle+' Ziel erreicht!':((goal-trained)+' Tag'+(goal-trained===1?'':'e')+' noch nötig')}</div>
-        </div>
-        <div class="week-goal-count ${done?'done':trained>0?'progress':'zero'}">${trained}<span style="font-size:16px;color:var(--text-muted)">/${goal}</span></div>
-      </div>
-      <div class="progress-bar-wrap">
-        <div class="progress-bar-bg"><div class="progress-bar-fill${done?' done':''}" style="--progress:${pct}%"></div></div>
-        <div class="progress-bar-label"><span>0</span><span>${goal} Tage</span></div>
-      </div>
-      <div class="goal-set-row">
-        <div class="goal-set-label">Ziel anpassen</div>
-        <div class="goal-stepper">
-          <button class="goal-step-btn" onclick="changeGoal(-1)">−</button>
-          <div class="goal-step-val">${goal}</div>
-          <button class="goal-step-btn" onclick="changeGoal(1)">+</button>
-        </div>
-      </div>
-    </div>
-    <div class="goal-card-inner">
-      <div class="goal-card-inner-label">Diese Woche</div>
-      <div class="goal-card-inner-dots">${weekDotsHtml}</div>
-    </div>`;
+  document.getElementById('goals-content').innerHTML=weekCardHtml(true);
   renderWeekHistory();
 }
 window.changeGoal = function(delta){
@@ -1148,7 +1130,7 @@ function renderWeekHistory(){
     if(Object.keys(sessions).some(k=>weekDays.includes(k))){result.push({monday,weekDays,trained});}
   }
   const goal=goals.trainDays||3;
-  if(!result.length){list.innerHTML=renderEmpty('target','Noch keine Daten','aus vergangenen Wochen.');return;}
+  if(!result.length){list.innerHTML=renderEmpty('target','Noch keine Daten','Hier erscheinen deine letzten Wochen.');return;}
   list.innerHTML=result.map(({monday,weekDays,trained})=>{
     const label=monday.getDate()+'.'+(monday.getMonth()+1)+'.';
     const dots=weekDays.map((k,i)=>{const t=sessions[k]&&sessions[k].exercises&&sessions[k].exercises.length>0;return `<div class="week-dot${t?' trained':''}">${DAYS[i]}</div>`;}).join('');
@@ -1187,21 +1169,18 @@ function syncTemplatesWithBests(){
 
 function renderTemplates(){
   const list=document.getElementById('template-list');
-  if(!templates.length){list.innerHTML=renderEmpty('clipboardList','Noch keine Vorlagen','Erstelle deine erste Vorlage!');return;}
+  if(!templates.length){list.innerHTML=renderEmpty('clipboardList','Noch keine Vorlagen','Erstelle deine erste Vorlage.');return;}
   list.innerHTML='';
   templates.forEach((tpl,ti)=>{
-    const card=document.createElement('div');card.className='template-card';
-    const pills=tpl.exercises.map(e=>`<span class="tpl-pill">${escapeHtml(e.name)}</span>`).join('');
+    const card=document.createElement('div');card.className='card template-card';
     card.innerHTML=`
-      <div class="template-header"><div>
-        <div class="template-name">${escapeHtml(tpl.name)}</div>
-        <div class="template-meta">${tpl.exercises.length} Übungen · ${tpl.exercises.reduce((s,e)=>s+e.sets.length,0)} Sätze</div>
-      </div></div>
-      <div class="template-ex-pills">${pills}</div>
+      <div class="template-name">${escapeHtml(tpl.name)}</div>
+      <div class="template-meta">${tpl.exercises.length} Übungen · ${setsLabel(tpl.exercises.reduce((s,e)=>s+e.sets.length,0))}</div>
+      <div class="template-ex">${namesPreview(tpl)}</div>
       <div class="template-actions">
-        <button class="tpl-btn import" onclick="openImportModal(${ti})">${ICONS.play} Import</button>
-        <button class="tpl-btn edit" onclick="openTemplateEditor(${ti})">${ICONS.pencil} Edit</button>
-        <button class="tpl-btn del" onclick="deleteTemplate(${ti})">${ICONS.x}</button>
+        <button class="btn btn--primary btn--sm" onclick="startTemplate(${tplRef(tpl)})">${ICONS.play} Starten</button>
+        <button class="btn btn--sm" onclick="openTemplateEditor(${ti})">${ICONS.pencil} Bearbeiten</button>
+        <button class="btn btn--sm btn--danger" onclick="deleteTemplate(${ti})" aria-label="Vorlage löschen">${ICONS.trash}</button>
       </div>`;
     list.appendChild(card);
   });
@@ -1224,19 +1203,11 @@ function showTemplateEditor(tpl){
 function renderTplExList(){
   const list=document.getElementById('tpl-ex-list');list.innerHTML='';
   (editingTemplate.exercises||[]).forEach((ex,ei)=>{
-    const div=document.createElement('div');div.className='tpl-ex-row';
-    const setsHtml=ex.sets.map((s,si)=>`
-      <div class="tpl-set-row">
-        <div class="tpl-set-label">Satz ${si+1}</div>
-        <div class="tpl-mini-inputs">
-          <input class="tpl-mini-input" type="number" min="0" max="${KG_MAX}" step="0.5" inputmode="decimal" value="${escapeHtml(s.kg)}" placeholder="kg" oninput="updateTplSet(${ei},${si},'kg',this)">
-          <input class="tpl-mini-input" type="number" min="0" max="${REPS_MAX}" step="1" inputmode="numeric" value="${escapeHtml(s.reps)}" placeholder="Wdh" oninput="updateTplSet(${ei},${si},'reps',this)">
-        </div>
-      </div>`).join('');
+    const div=document.createElement('div');div.className='tpl-ex';
     div.innerHTML=`
-      <div class="tpl-ex-row-header"><div class="tpl-ex-row-name">${escapeHtml(ex.name)}</div><button class="tpl-ex-remove" onclick="removeTplEx(${ei})">${ICONS.x}</button></div>
-      <div class="tpl-sets-grid">${setsHtml}</div>
-      <button class="tpl-add-set" onclick="addTplSet(${ei})">+ Satz</button>`;
+      <div class="tpl-ex-head"><div class="tpl-ex-name">${escapeHtml(ex.name)}</div><button class="tpl-ex-remove" onclick="removeTplEx(${ei})">Entfernen</button></div>
+      ${setRows(ex.sets,ei,'updateTplSet','removeTplSet')}
+      <button class="add-set" onclick="addTplSet(${ei})">+ Satz</button>`;
     list.appendChild(div);
   });
 }
@@ -1246,6 +1217,7 @@ window.updateTplSet = function(ei,si,field,input){
   editingTemplate.exercises[ei].sets[si][field]=val;
 }
 window.addTplSet = function(ei){editingTemplate.exercises[ei].sets.push({kg:'',reps:''});renderTplExList();}
+window.removeTplSet = function(ei,si){editingTemplate.exercises[ei].sets.splice(si,1);renderTplExList();}
 window.removeTplEx = function(ei){editingTemplate.exercises.splice(ei,1);renderTplExList();}
 window.saveTemplate = async function(){
   const name=document.getElementById('tpl-name-input').value.trim();
@@ -1293,23 +1265,46 @@ window.addTplCustomExercise = function(){
   window.addTplExercise(name);
 };
 window.addTplExercise = function(name){
-  editingTemplate.exercises.push({name,sets:[{kg:'',reps:''},{kg:'',reps:''},{kg:'',reps:''}]});
+  editingTemplate.exercises.push({name,sets:newSets(name,'9999-12-31')});
   window.closeModal('tpl-ex-modal-overlay');renderTplExList();
 };
-window.openImportModal = function(ti){
-  importingTemplateId=templates[ti].id;
-  document.getElementById('import-modal-title').textContent=`"${templates[ti].name}" importieren`;
+// ── LOAD INTO TODAY ──
+// A template or an earlier training becomes today's training, values included.
+// An empty day takes it directly; otherwise the user picks add or replace.
+function loadIntoToday(exercises,label){
+  pendingImport=exercises.map(e=>({name:e.name,open:true,sets:e.sets.map(s=>({kg:s.kg||'',reps:s.reps||''}))}));
+  window.closeModal('load-modal-overlay');
+  if(!currentSession.exercises.length)return window.doImport('replace');
+  document.getElementById('import-modal-title').textContent=`„${label}“ übernehmen`;
   window.openModal('import-modal-overlay');
-};
+}
+// By id, not list index: a list shown earlier (open picker) may be outdated by
+// a change on another device. tplRef = the id as a JS literal for onclick.
+function tplRef(t){return escapeHtml(JSON.stringify(t.id));}
+window.startTemplate = function(id){const t=templates.find(t=>t.id===id);if(t)loadIntoToday(t.exercises,t.name);};
+window.copySessionToToday = function(key){const s=sessions[key];if(s)loadIntoToday(s.exercises,shortDate(key));};
 window.doImport = function(mode){
-  const tpl=templates.find(t=>t.id===importingTemplateId);if(!tpl)return;
-  const newEx=tpl.exercises.map(e=>({name:e.name,open:true,sets:e.sets.map(s=>({kg:s.kg||'',reps:s.reps||''}))}));
-  if(mode==='replace')currentSession.exercises=newEx;
-  else currentSession.exercises=[...currentSession.exercises,...newEx];
-  scheduleSave();importingTemplateId=null;window.closeModal('import-modal-overlay');window.showPage('today');
+  if(!pendingImport)return;
+  currentSession.exercises=mode==='replace'?pendingImport:[...currentSession.exercises,...pendingImport];
+  pendingImport=null;
+  scheduleSave();window.closeModal('import-modal-overlay');window.showPage('today');
   animateNextStats=true;
   render();
   staggerIn('exercise-list');
+};
+// Picker for templates and earlier trainings; onlyTrainings when the start
+// panel already shows the templates
+window.openLoadModal = function(onlyTrainings){
+  const row=(onclick,title,sub)=>`<button class="pick-row" onclick="${onclick}"><span class="pick-main"><span class="pick-title">${title}</span><span class="pick-sub">${sub}</span></span><span class="chev">${ICONS.chevronRight}</span></button>`;
+  const tpls=onlyTrainings?'':templates.map(t=>row(`startTemplate(${tplRef(t)})`,escapeHtml(t.name),namesPreview(t))).join('');
+  // Date keys are validated (DATE_KEY), safe inside the handler
+  const past=trainedKeysBefore(currentKey).map(k=>row(`copySessionToToday('${k}')`,shortDate(k)+' '+k.slice(0,4),namesPreview(sessions[k]))).join('');
+  document.getElementById('load-modal-title').textContent=onlyTrainings?'Training kopieren':'Vorlage oder Training übernehmen';
+  document.getElementById('load-options').innerHTML=
+    (tpls?`<div class="muscle-label">Vorlagen</div>${tpls}`:'')+
+    (past?`<div class="muscle-label">Frühere Trainings</div>${past}`:'')||
+    '<div class="no-results">Noch keine Vorlagen oder Trainings.</div>';
+  window.openModal('load-modal-overlay');
 };
 
 // ── BACKLOG / VERGANGENES TRAINING ERFASSEN ──
@@ -1340,7 +1335,8 @@ function setBacklogDate(key){
   if(!(key in backlogSeen))backlogSeen[key]=stamp(sessions[key]);
   const d=new Date(key+'T12:00:00');
   const dayIdx=(d.getDay()+6)%7;
-  document.getElementById('backlog-date-label').textContent=DAYS_FULL[dayIdx]+', '+d.getDate()+'. '+monthsFull[d.getMonth()]+' '+d.getFullYear();
+  document.getElementById('backlog-eyebrow').textContent=(backlogOriginalKey?'Training bearbeiten':'Training nachtragen')+' · '+DAYS_FULL[dayIdx];
+  document.getElementById('backlog-date-label').textContent=d.getDate()+'. '+monthsFull[d.getMonth()]+' '+d.getFullYear();
 }
 
 window.openBacklogDateModal = function(){
@@ -1413,7 +1409,7 @@ window.saveBacklog = async function(){
     else{
       lostDrafts[to]={from,draft:structuredClone(draft),seen};
       const d=new Date(to+'T12:00:00');
-      setSyncStatus('error',`✗ Training vom ${d.getDate()}. ${monthsFull[d.getMonth()]} nicht gespeichert – öffne den Tag erneut für deinen Entwurf`,3000);
+      setSyncStatus('error',`Training vom ${d.getDate()}. ${monthsFull[d.getMonth()]} nicht gespeichert – öffne den Tag erneut für deinen Entwurf`,3000);
     }
   };
   const ok=await settleWrite(tracked);
@@ -1443,11 +1439,12 @@ function renderBacklogExercises(){
       idx:ei,
       showDelete:true,
       namespace:'backlog',
+      ghost:lastSets(ex.name,backlogKey),
     });
     list.appendChild(card);
   });
   if(!backlogSession.exercises.length){
-    list.innerHTML=renderEmpty('calendar','Training hinzufügen','Füge Übungen für dieses<br>vergangene Training hinzu.');
+    list.innerHTML=renderEmpty('calendar','Noch keine Übungen','Füge die Übungen dieses Trainings hinzu.');
   }
 }
 
@@ -1455,9 +1452,13 @@ window.toggleBacklogEx=function(i){backlogSession.exercises[i].open=!backlogSess
 window.updateBacklogSet=function(ei,si,field,input){
   const val=clampSetValue(field, input.value);
   if(val!==input.value)input.value=val;
-  backlogSession.exercises[ei].sets[si][field]=val;
+  const ex=backlogSession.exercises[ei];
+  ex.sets[si][field]=val;
+  const vol=document.querySelectorAll('#backlog-exercise-list .exercise-card')[ei]?.querySelector('.ex-vol b');
+  if(vol)vol.textContent=Math.round(calcExVol(ex)).toLocaleString('de')+' kg';
 };
 window.addBacklogSet=function(ei){backlogSession.exercises[ei].sets.push({kg:'',reps:''});renderBacklogExercises();};
+window.removeBacklogSet=function(ei,si){backlogSession.exercises[ei].sets.splice(si,1);renderBacklogExercises();};
 window.removeBacklogEx=function(ei){backlogSession.exercises.splice(ei,1);renderBacklogExercises();};
 
 // Backlog exercise modal
@@ -1474,13 +1475,14 @@ window.addBacklogCustomExercise=function(){
   window.addBacklogExercise(name);
 };
 window.addBacklogExercise=function(name){
-  backlogSession.exercises.push({name,open:true,sets:[{kg:'',reps:''},{kg:'',reps:''},{kg:'',reps:''}]});
+  backlogSession.exercises.push({name,open:true,sets:newSets(name,backlogKey)});
   window.closeModal('backlog-ex-modal-overlay');renderBacklogExercises();
   popInLast('backlog-exercise-list');
 };
 
 // ── PROGRESS ──
 function renderProgress(){
+  renderGoals();
   renderHeatmap();
   populateExSelect();
   renderProgressChart();
@@ -1717,7 +1719,7 @@ function populateExSelect(){
 function getChartColors(){
   const cs=getComputedStyle(document.documentElement);
   const v=name=>cs.getPropertyValue(name).trim();
-  return {grid:v('--border'),text:v('--text-muted'),line:v('--accent'),fillTop:v('--accent-glow'),last:v('--gold')};
+  return {grid:v('--line'),text:v('--muted'),line:v('--ink'),fillTop:v('--soft'),last:v('--text')};
 }
 
 // In-flight reveal animation — cancelled on re-entry (theme toggle, resize, select change)
@@ -1753,7 +1755,7 @@ window.renderProgressChart = function(){
   });
 
   if(points.length<2){
-    ctx.fillStyle=col.text;ctx.font='13px DM Sans';
+    ctx.fillStyle=col.text;ctx.font='13px Inter, sans-serif';
     ctx.textAlign='center';ctx.fillText('Mindestens 2 Einträge nötig',W/2,H/2);
     return;
   }
@@ -1775,7 +1777,7 @@ window.renderProgressChart = function(){
       const y=pad.top+cH-(cH/gridSteps)*i;
       ctx.beginPath();ctx.moveTo(pad.left,y);ctx.lineTo(W-pad.right,y);ctx.stroke();
       const val=Math.round(minKg+(rangeKg/gridSteps)*i);
-      ctx.fillStyle=col.text;ctx.font='11px Space Grotesk';ctx.textAlign='right';
+      ctx.fillStyle=col.text;ctx.font='11px Inter, sans-serif';ctx.textAlign='right';
       ctx.fillText(val+'kg',pad.left-8,y+4);
     }
 
@@ -1784,8 +1786,8 @@ window.renderProgressChart = function(){
     const step=Math.floor(points.length/labelCount);
     for(let i=0;i<points.length;i+=step){
       const x=pad.left+(cW/(points.length-1))*i;
-      const d=points[i].date.slice(5).replace('-','.');
-      ctx.fillStyle=col.text;ctx.font='10px Space Grotesk';ctx.textAlign='center';
+      const d=points[i].date.slice(8)+'.'+points[i].date.slice(5,7)+'.';
+      ctx.fillStyle=col.text;ctx.font='10px Inter, sans-serif';ctx.textAlign='center';
       ctx.fillText(d,x,H-8);
     }
 
@@ -1816,7 +1818,7 @@ window.renderProgressChart = function(){
     });
     ctx.strokeStyle=col.line;ctx.lineWidth=2.5;ctx.lineJoin='round';ctx.stroke();
 
-    // Dots — the most recent entry is highlighted in gold
+    // Dots — the most recent entry is highlighted
     points.forEach((p,i)=>{
       const x=pad.left+(cW/(points.length-1))*i;
       const y=pad.top+cH-((p.kg-minKg)/rangeKg)*cH;

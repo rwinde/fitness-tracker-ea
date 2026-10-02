@@ -4,8 +4,10 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1, viewport-fit=cover">
 <meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="theme-color" content="#060605">
+<!-- "default" follows the system appearance (light bar in light mode, dark in dark mode) -->
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="theme-color" content="#f4f4f3" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#0a0a0b" media="(prefers-color-scheme: dark)">
 <title>Fitness Tracker</title>
 <link rel="manifest" href="manifest.json">
 <link rel="icon" type="image/png" href="icon.png">
@@ -13,21 +15,19 @@
 <meta name="apple-mobile-web-app-title" content="Fitness">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="styles.css?v=v2.10.0">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="styles.css?v=v3.0.0">
 <script>
-var APP_VERSION='v2.10.0';
+var APP_VERSION='v3.0.0';
 // App-shell service worker for offline restarts (sw.js). Registering it
 // replaces any legacy worker at this scope; workers of other apps on the
 // same origin stay untouched.
 if('serviceWorker' in navigator){navigator.serviceWorker.register('sw.js');}
-// Detect standalone mode reliably on iOS
-if(window.navigator.standalone===true||window.matchMedia('(display-mode:standalone)').matches){
-  document.documentElement.classList.add('standalone');
-}
+// Apply a stored light/dark override before the first paint (no flash)
+try{var mode=localStorage.getItem('themeMode');if(mode==='light'||mode==='dark')document.documentElement.setAttribute('data-theme',mode);}catch(e){}
 function setVersionDisplay(){
   var el=document.getElementById('version-display');
-  if(el)el.textContent=APP_VERSION;
+  if(el)el.textContent='Version '+APP_VERSION;
 }
 if(document.readyState==='loading'){
   document.addEventListener('DOMContentLoaded',setVersionDisplay);
@@ -41,11 +41,11 @@ if(document.readyState==='loading'){
 <div class="loading-screen" id="loading-screen">Wird geladen…</div>
 
 <div class="login-screen" id="login-screen" style="display:none">
-  <div class="login-hero"><img id="loginImg" src="hero.jpg" alt="Avatar"></div>
-  <div class="login-title">Fitness Tracker</div>
-  <div class="login-sub">Maximum Gains</div>
+  <img class="login-logo" src="icon.png" alt="">
+  <h1 class="login-title">Fitness Tracker</h1>
+  <p class="login-sub">Trainings erfassen, Fortschritt sehen.</p>
   <button class="login-btn" onclick="signInWithGoogle()">
-    <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" alt="Google">
+    <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" alt="">
     Mit Google anmelden
   </button>
   <div class="login-error" id="login-error"></div>
@@ -54,107 +54,87 @@ if(document.readyState==='loading'){
 <div class="app" id="main-app" style="display:none">
 
   <div class="page active" id="page-today">
-    <div class="app-brand">
-      <div class="app-brand-name">Fitness Tracker</div>
-      <div class="app-brand-tagline">Road to Hanma</div>
-    </div>
-    <div class="hero">
-      <div class="hero-img"><img id="heroImg" src="hero.jpg" alt="Avatar"></div>
-      <div class="hero-info">
-        <div class="hero-title">Fitness<br>Tracker</div>
-        <div class="hero-sub">Maximum Gains</div>
-        <div class="hero-divider"></div>
-        <div class="hero-date" id="datedisp"></div>
-        <div class="hero-month" id="monthdisp"></div>
-        <div style="font-size:11px;color:var(--text-muted);font-family:'Space Grotesk',sans-serif;letter-spacing:0.04em;margin-top:2px" id="version-display"></div>
+    <header class="page-head">
+      <div class="eyebrow" id="today-date"></div>
+      <h1 class="page-title">Heute</h1>
+    </header>
+    <!-- Empty day: week progress + ways to start (templates, copy, empty) -->
+    <div id="start-panel"></div>
+    <div id="training-panel">
+      <div class="summary">
+        <div class="summary-item"><b id="stat-ex">0</b><span>Übungen</span></div>
+        <div class="summary-item"><b id="stat-sets">0</b><span>Sätze</span></div>
+        <div class="summary-item"><b id="stat-vol">0</b><span>kg Volumen</span></div>
+      </div>
+      <div id="exercise-list"></div>
+      <div class="actions">
+        <button class="btn" onclick="openExerciseModal()"><span data-icon="plus"></span> Übung</button>
+        <button class="btn" onclick="openLoadModal(false)"><span data-icon="copy"></span> Vorlage / Kopie</button>
+      </div>
+      <div class="sec-label">Notizen</div>
+      <textarea class="notes" id="notes" maxlength="2000" placeholder="Wie lief das Training…"></textarea>
+      <div class="savebar">
+        <div class="sync-bar" id="sync-bar">Alles gesichert</div>
+        <button class="btn btn--primary" id="finish-btn" onclick="finishTraining()"><span data-icon="check"></span> Speichern</button>
       </div>
     </div>
-    <div class="sync-bar" id="sync-bar">Bereit</div>
-    <div class="weekrow" id="weekdays"></div>
-    <button class="backlog-btn" onclick="openBacklogDateModal()"><span data-icon="calendar"></span> Vergangenes Training erfassen</button>
-    <div class="stats-row">
-      <div class="stat-card"><div class="stat-num" id="stat-ex">0</div><div class="stat-lbl">Übungen</div></div>
-      <div class="stat-card"><div class="stat-num" id="stat-sets">0</div><div class="stat-lbl">Sätze</div></div>
-      <div class="stat-card"><div class="stat-num" id="stat-vol">0</div><div class="stat-lbl">kg Total</div></div>
-    </div>
-    <button class="finish-btn disabled" id="finish-btn" onclick="finishTraining()" disabled><span data-icon="check"></span> Training abschließen</button>
-    <div class="sec-label">Übungen</div>
-    <div id="exercise-list"></div>
-    <button class="add-exercise-btn" onclick="openExerciseModal()">+ Übung hinzufügen</button>
-    <div class="page-spacer"></div>
-    <div class="sec-label">Notizen</div>
-    <div class="notes-area"><textarea id="notes" maxlength="2000" placeholder="Wie lief das Training…"></textarea></div>
-    <div style="height:80px"></div>
   </div>
 
   <div class="page" id="page-history">
-    <div class="page-title">Verlauf</div>
+    <header class="page-head"><h1 class="page-title">Verlauf</h1></header>
+    <button class="btn btn--block list-top-btn" onclick="openBacklogDateModal()"><span data-icon="calendar"></span> Training nachtragen</button>
     <div id="history-list"></div>
   </div>
 
   <div class="page" id="page-detail">
-    <button class="detail-back" onclick="showPage('history')"><span data-icon="arrowLeft"></span> Zurück</button>
-    <div class="detail-header">
-      <div class="detail-header-main">
-        <div class="detail-title" id="detail-title"></div>
-        <div class="detail-sub" id="detail-sub"></div>
-      </div>
-      <div class="detail-header-actions">
-        <button class="btn btn--primary btn--sm" onclick="editSession()"><span data-icon="pencil"></span> Edit</button>
-        <button class="btn btn--destructive btn--sm" onclick="deleteSession()" aria-label="Training löschen"><span data-icon="trash"></span></button>
-      </div>
+    <button class="back" onclick="showPage('history')"><span data-icon="chevronLeft"></span> Verlauf</button>
+    <header class="page-head">
+      <div class="eyebrow" id="detail-sub"></div>
+      <h1 class="page-title page-title--sm" id="detail-title"></h1>
+    </header>
+    <div class="detail-actions">
+      <button class="btn btn--primary" id="detail-copy" onclick="copySession()"><span data-icon="copy"></span> Auf heute kopieren</button>
+      <button class="btn" onclick="editSession()" aria-label="Training bearbeiten"><span data-icon="pencil"></span></button>
+      <button class="btn btn--danger" onclick="deleteSession()" aria-label="Training löschen"><span data-icon="trash"></span></button>
     </div>
-    <div class="stats-row" id="detail-stats"></div>
-    <div class="sec-label">Übungen</div>
+    <div class="summary" id="detail-stats"></div>
     <div id="detail-exercises"></div>
     <div id="detail-notes-wrap"></div>
-    <div style="height:80px"></div>
-  </div>
-
-  <div class="page" id="page-goals">
-    <div class="page-title">Wochenziele</div>
-    <div id="goals-content"></div>
-    <div class="week-history-section">
-      <div class="week-history-title">Letzte Wochen</div>
-      <div id="week-history-list"></div>
-    </div>
   </div>
 
   <div class="page" id="page-backlog">
-    <button class="detail-back" onclick="cancelBacklog()"><span data-icon="arrowLeft"></span> Abbrechen</button>
-    <div class="backlog-banner">
-      <div class="backlog-banner-title"><span data-icon="calendar"></span> Vergangenes Training erfassen</div>
-      <div class="backlog-banner-row">
-        <div class="backlog-banner-date" id="backlog-date-label"></div>
-        <label class="backlog-date-change">
-          <span>Datum ändern</span>
-          <input type="date" id="backlog-change-date" onchange="changeBacklogDate(this.value)">
-        </label>
-      </div>
-    </div>
-    <div class="sec-label">Übungen</div>
+    <button class="back" onclick="cancelBacklog()"><span data-icon="chevronLeft"></span> Abbrechen</button>
+    <header class="page-head">
+      <div class="eyebrow" id="backlog-eyebrow">Training nachtragen</div>
+      <h1 class="page-title page-title--sm" id="backlog-date-label"></h1>
+    </header>
+    <label class="date-change">
+      <span data-icon="calendar"></span> Datum ändern
+      <input type="date" id="backlog-change-date" onchange="changeBacklogDate(this.value)">
+    </label>
     <div id="backlog-exercise-list"></div>
-    <button class="add-exercise-btn" onclick="openBacklogExModal()">+ Übung hinzufügen</button>
+    <button class="btn btn--block" onclick="openBacklogExModal()"><span data-icon="plus"></span> Übung</button>
     <div class="sec-label">Notizen</div>
-    <div class="notes-area"><textarea id="backlog-notes" maxlength="2000" placeholder="Wie lief das Training…"></textarea></div>
-    <div style="margin-top:16px;display:flex;gap:8px;margin-bottom:80px">
-      <button class="btn btn--secondary" style="flex:1" onclick="cancelBacklog()">Abbrechen</button>
-      <button class="btn btn--warm" style="flex:2" onclick="saveBacklog()">Training speichern</button>
+    <textarea class="notes" id="backlog-notes" maxlength="2000" placeholder="Wie lief das Training…"></textarea>
+    <div class="form-actions">
+      <button class="btn" onclick="cancelBacklog()">Abbrechen</button>
+      <button class="btn btn--primary" onclick="saveBacklog()">Training speichern</button>
     </div>
   </div>
 
   <div class="page" id="page-templates">
-    <div class="page-title">Vorlagen</div>
-    <button class="add-template-btn" onclick="openTemplateEditor(null)">+ Neue Vorlage erstellen</button>
+    <header class="page-head"><h1 class="page-title">Vorlagen</h1></header>
+    <button class="btn btn--block list-top-btn" onclick="openTemplateEditor(null)"><span data-icon="plus"></span> Neue Vorlage</button>
     <div id="template-list"></div>
   </div>
 
   <div class="page" id="page-progress">
-    <div class="page-title">Fortschritt</div>
-    <div class="chart-card">
+    <header class="page-head"><h1 class="page-title">Stats</h1></header>
+    <div id="goals-content"></div>
+    <div class="card chart-card">
       <div class="chart-title">Trainingsfrequenz</div>
       <div class="heatmap-controls">
-        <div class="heatmap-view-toggle">
+        <div class="segmented">
           <button class="heatmap-view-btn active" id="hm-view-month" onclick="setHeatmapView('month')">Monat</button>
           <button class="heatmap-view-btn" id="hm-view-year" onclick="setHeatmapView('year')">Jahr</button>
         </div>
@@ -172,13 +152,15 @@ if(document.readyState==='loading'){
         <span class="heatmap-legend-item"><span class="heatmap-legend-dot"></span>Pause</span>
       </div>
     </div>
-    <div class="chart-card">
+    <div class="card chart-card">
       <div class="chart-title">Gewichtsentwicklung</div>
-      <div class="chart-sub">Bestes Gewicht pro Session</div>
+      <div class="chart-sub">Bestes Gewicht pro Training</div>
       <select class="exercise-select" id="progress-ex-select" onchange="renderProgressChart()"></select>
       <canvas class="chart-canvas" id="progress-chart"></canvas>
-      <div id="progress-empty" style="display:none;text-align:center;color:var(--text-muted);font-size:15px;padding:20px 0">Wähle eine Übung mit Daten aus</div>
+      <div class="no-results" id="progress-empty" style="display:none">Wähle eine Übung mit Daten aus</div>
     </div>
+    <div class="sec-label">Letzte Wochen</div>
+    <div class="card list" id="week-history-list"></div>
   </div>
 
 </div>
@@ -190,24 +172,25 @@ if(document.readyState==='loading'){
   </button>
   <div class="profile-menu" id="profile-menu" role="menu">
     <div class="profile-menu-name" id="user-name"></div>
-    <button class="profile-menu-row" id="theme-toggle" onclick="toggleTheme()" role="menuitemcheckbox">
-      <span class="profile-menu-row-label"><span id="theme-toggle-icon"></span>Dark Mode</span>
-      <span class="switch" id="theme-switch"><span class="switch-knob"></span></span>
-    </button>
+    <div class="profile-menu-label">Darstellung</div>
+    <div class="segmented" id="theme-modes" role="group" aria-label="Darstellung">
+      <button data-mode="auto" onclick="setThemeMode('auto')">Auto</button>
+      <button data-mode="light" onclick="setThemeMode('light')">Hell</button>
+      <button data-mode="dark" onclick="setThemeMode('dark')">Dunkel</button>
+    </div>
     <button class="profile-menu-row profile-menu-row--logout" onclick="signOut()" role="menuitem">
       <span data-icon="logOut"></span>Abmelden
     </button>
+    <div class="profile-menu-version" id="version-display"></div>
   </div>
 </div>
 
-<div class="bottom-nav" id="bottom-nav" style="display:none">
-  <div class="nav-indicator" id="nav-indicator"></div>
-  <button class="nav-btn active" id="nav-today" onclick="showPage('today')"><span class="nav-icon"><span data-icon="zap"></span></span>Heute</button>
+<nav class="bottom-nav" id="bottom-nav" style="display:none">
+  <button class="nav-btn active" id="nav-today" onclick="showPage('today')"><span class="nav-icon"><span data-icon="home"></span></span>Heute</button>
   <button class="nav-btn" id="nav-templates" onclick="showPage('templates')"><span class="nav-icon"><span data-icon="clipboardList"></span></span>Vorlagen</button>
-  <button class="nav-btn" id="nav-goals" onclick="showPage('goals')"><span class="nav-icon"><span data-icon="target"></span></span>Ziele</button>
-  <button class="nav-btn" id="nav-progress" onclick="showPage('progress')"><span class="nav-icon"><span data-icon="trendingUp"></span></span>Stats</button>
   <button class="nav-btn" id="nav-history" onclick="showPage('history')"><span class="nav-icon"><span data-icon="history"></span></span>Verlauf</button>
-</div>
+  <button class="nav-btn" id="nav-progress" onclick="showPage('progress')"><span class="nav-icon"><span data-icon="barChart"></span></span>Stats</button>
+</nav>
 
 <div class="sync-toast" id="sync-toast" role="alert"></div>
 
@@ -217,22 +200,29 @@ if(document.readyState==='loading'){
     <button class="modal-close" onclick="closeModal('modal-overlay')" aria-label="Schließen"><span data-icon="x"></span></button>
     <div class="modal-title" id="ex-modal-title">Übung wählen</div>
     <div class="search-row">
-      <input class="search-input" id="search" placeholder="Suchen oder eigene eingeben…" oninput="filterExercises()">
-      <button class="custom-add-btn" id="custom-btn" onclick="addCustomExercise()">+ Neu</button>
+      <input class="text-input" id="search" placeholder="Suchen oder eigene eingeben…" oninput="filterExercises()">
+      <button class="btn btn--primary btn--sm custom-add-btn" id="custom-btn" onclick="addCustomExercise()">+ Neu</button>
     </div>
     <div id="exercise-options"></div>
   </div>
 </div>
 
+<div class="modal-overlay" id="load-modal-overlay" onclick="closeModalOnOverlay(event,'load-modal-overlay')">
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="load-modal-title" onclick="event.stopPropagation()">
+    <button class="modal-close" onclick="closeModal('load-modal-overlay')" aria-label="Schließen"><span data-icon="x"></span></button>
+    <div class="modal-title" id="load-modal-title">Übernehmen</div>
+    <div id="load-options"></div>
+  </div>
+</div>
+
 <div class="modal-overlay" id="tpl-editor-overlay" onclick="closeModalOnOverlay(event,'tpl-editor-overlay')">
-  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="tpl-editor-title" onclick="event.stopPropagation()" style="max-height:88vh">
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="tpl-editor-title" onclick="event.stopPropagation()">
     <button class="modal-close" onclick="closeModal('tpl-editor-overlay')" aria-label="Schließen"><span data-icon="x"></span></button>
     <div class="modal-title" id="tpl-editor-title">Vorlage erstellen</div>
-    <input class="tpl-input" id="tpl-name-input" maxlength="60" placeholder="Name (z.B. Push Day A)">
-    <div class="sec-label">Übungen</div>
+    <input class="text-input" id="tpl-name-input" maxlength="60" placeholder="Name (z.B. Push Day A)">
     <div id="tpl-ex-list"></div>
-    <button class="tpl-add-ex-btn" onclick="openTplExModal()">+ Übung hinzufügen</button>
-    <button class="tpl-save-btn" onclick="saveTemplate()">Vorlage speichern</button>
+    <button class="btn btn--block tpl-add-ex" onclick="openTplExModal()"><span data-icon="plus"></span> Übung</button>
+    <button class="btn btn--primary btn--block" onclick="saveTemplate()">Vorlage speichern</button>
   </div>
 </div>
 
@@ -241,8 +231,8 @@ if(document.readyState==='loading'){
     <button class="modal-close" onclick="closeModal('tpl-ex-modal-overlay')" aria-label="Schließen"><span data-icon="x"></span></button>
     <div class="modal-title" id="tpl-ex-modal-title">Übung wählen</div>
     <div class="search-row">
-      <input class="search-input" id="tpl-search" placeholder="Suchen…" oninput="filterTplExercises()">
-      <button class="custom-add-btn" id="tpl-custom-btn" onclick="addTplCustomExercise()">+ Neu</button>
+      <input class="text-input" id="tpl-search" placeholder="Suchen…" oninput="filterTplExercises()">
+      <button class="btn btn--primary btn--sm custom-add-btn" id="tpl-custom-btn" onclick="addTplCustomExercise()">+ Neu</button>
     </div>
     <div id="tpl-exercise-options"></div>
   </div>
@@ -251,14 +241,15 @@ if(document.readyState==='loading'){
 <div class="modal-overlay" id="import-modal-overlay" onclick="closeModalOnOverlay(event,'import-modal-overlay')">
   <div class="modal" role="dialog" aria-modal="true" aria-labelledby="import-modal-title" onclick="event.stopPropagation()">
     <button class="modal-close" onclick="closeModal('import-modal-overlay')" aria-label="Schließen"><span data-icon="x"></span></button>
-    <div class="modal-title" id="import-modal-title">Vorlage importieren</div>
-    <div class="import-option" role="button" tabindex="0" onclick="doImport('replace')">
-      <div class="import-option-icon"><span data-icon="rotateCcw"></span></div>
-      <div><div class="import-option-title">Ersetzen</div><div class="import-option-desc">Aktuelle Übungen löschen und durch Vorlage ersetzen</div></div>
-    </div>
+    <div class="modal-title" id="import-modal-title">Übernehmen</div>
+    <div class="modal-text">Heute sind schon Übungen eingetragen.</div>
     <div class="import-option" role="button" tabindex="0" onclick="doImport('add')">
       <div class="import-option-icon"><span data-icon="plus"></span></div>
-      <div><div class="import-option-title">Hinzufügen</div><div class="import-option-desc">Vorlage zu bestehenden Übungen hinzufügen</div></div>
+      <div><div class="import-option-title">Hinzufügen</div><div class="import-option-desc">Zu den heutigen Übungen dazu</div></div>
+    </div>
+    <div class="import-option" role="button" tabindex="0" onclick="doImport('replace')">
+      <div class="import-option-icon"><span data-icon="rotateCcw"></span></div>
+      <div><div class="import-option-title">Ersetzen</div><div class="import-option-desc">Heutige Übungen löschen und ersetzen</div></div>
     </div>
   </div>
 </div>
@@ -268,8 +259,8 @@ if(document.readyState==='loading'){
     <button class="modal-close" onclick="closeModal('backlog-ex-modal-overlay')" aria-label="Schließen"><span data-icon="x"></span></button>
     <div class="modal-title" id="backlog-ex-modal-title">Übung wählen</div>
     <div class="search-row">
-      <input class="search-input" id="backlog-search" placeholder="Suchen oder eigene eingeben…" oninput="filterBacklogExercises()">
-      <button class="custom-add-btn" id="backlog-custom-btn" onclick="addBacklogCustomExercise()">+ Neu</button>
+      <input class="text-input" id="backlog-search" placeholder="Suchen oder eigene eingeben…" oninput="filterBacklogExercises()">
+      <button class="btn btn--primary btn--sm custom-add-btn" id="backlog-custom-btn" onclick="addBacklogCustomExercise()">+ Neu</button>
     </div>
     <div id="backlog-exercise-options"></div>
   </div>
@@ -278,13 +269,13 @@ if(document.readyState==='loading'){
 <div class="modal-overlay" id="backlog-date-modal-overlay" onclick="closeModalOnOverlay(event,'backlog-date-modal-overlay')">
   <div class="modal" role="dialog" aria-modal="true" aria-labelledby="backlog-date-modal-title" onclick="event.stopPropagation()">
     <button class="modal-close" onclick="closeModal('backlog-date-modal-overlay')" aria-label="Schließen"><span data-icon="x"></span></button>
-    <div class="modal-title" id="backlog-date-modal-title" style="color:var(--gold-warm)"><span data-icon="calendar"></span> Vergangenes Training erfassen</div>
-    <div style="font-size:15px;color:var(--text-secondary);margin-bottom:16px">Für welches Datum möchtest du ein Training eintragen?</div>
-    <input type="date" id="backlog-date-input" style="width:100%;padding:14px 16px;background:var(--surface2);color:var(--text);border:1px solid var(--border);border-radius:var(--radius-sm);font-size:18px;font-family:'DM Sans',sans-serif;-webkit-appearance:none;appearance:none;outline:none;margin-bottom:16px">
-    <button class="btn btn--warm btn--block" onclick="confirmBacklogDate()">Weiter</button>
+    <div class="modal-title" id="backlog-date-modal-title">Training nachtragen</div>
+    <div class="modal-text">Für welchen Tag möchtest du ein Training eintragen?</div>
+    <input class="text-input date-input" type="date" id="backlog-date-input">
+    <button class="btn btn--primary btn--block" onclick="confirmBacklogDate()">Weiter</button>
   </div>
 </div>
 
-<script type="module" src="app.js?v=v2.10.0"></script>
+<script type="module" src="app.js?v=v3.0.0"></script>
 </body>
 </html>
