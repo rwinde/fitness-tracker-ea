@@ -135,7 +135,6 @@ let tplSeen; // stamp of the stored template the editor started from
 let pendingImport = null; // exercises waiting for the add/replace choice
 let saveTimer = null;
 let lastEditAt = 0;
-let dragSrcIdx = null;
 // Every auth change bumps authGen; async results that started under an older
 // generation are dropped. activeUid is set only once the account's data has
 // loaded — all writes go there, so nothing is saved before (or after) that.
@@ -688,10 +687,10 @@ function renderExerciseCard(ex,opts){
     ?{update:'updateBacklogSet',toggle:'toggleBacklogEx',addSet:'addBacklogSet',removeSet:'removeBacklogSet',remove:'removeBacklogEx'}
     :{update:'updateSet',toggle:'toggleEx',addSet:'addSet',removeSet:'removeSet',remove:'removeEx'};
   card.className='exercise-card'+(hasPRClass?' has-pr':'');
-  if(draggable){card.draggable=true;card.dataset.idx=idx;}
+  if(draggable)card.dataset.idx=idx;
   if(flashAnimation)card.classList.add('pr-flash');
-  // No touchstart stopPropagation here: the touch-drag starter listens on document
-  const dragHandle=draggable?`<span class="drag-handle" onmousedown="event.stopPropagation()">${ICONS.gripVertical}</span>`:'';
+  // Reordering starts on pointerdown (listener on #exercise-list); a tap on the handle doesn't toggle the card
+  const dragHandle=draggable?`<span class="drag-handle" onclick="event.stopPropagation()">${ICONS.gripVertical}</span>`:'';
   const sub=ex.open&&subOpen?subOpen:`${setsLabel(ex.sets.length)} · ${vol} kg`;
   card.innerHTML=`
     <div class="exercise-header" role="button" tabindex="0" aria-expanded="${!!ex.open}" onclick="${fn.toggle}(${idx})">
@@ -731,20 +730,6 @@ function render(){
       flashAnimation:isNewPR,
       isPRSet:(si,sKg,sR)=>sKg>0&&(!pr||sKg>pr.kg||(sKg===pr.kg&&sR>=pr.reps)),
       ghost:lastSets(ex.name,currentKey),
-    });
-    // Drag & Drop
-    card.addEventListener('dragstart',e=>{dragSrcIdx=ei;card.classList.add('dragging');e.dataTransfer.effectAllowed='move';});
-    card.addEventListener('dragend',()=>{card.classList.remove('dragging');document.querySelectorAll('.exercise-card').forEach(c=>c.classList.remove('drag-over'));});
-    card.addEventListener('dragover',e=>{e.preventDefault();e.dataTransfer.dropEffect='move';card.classList.add('drag-over');});
-    card.addEventListener('dragleave',()=>card.classList.remove('drag-over'));
-    card.addEventListener('drop',e=>{
-      e.preventDefault();card.classList.remove('drag-over');
-      if(dragSrcIdx!==null&&dragSrcIdx!==ei){
-        const moved=currentSession.exercises.splice(dragSrcIdx,1)[0];
-        currentSession.exercises.splice(ei,0,moved);
-        scheduleSave();render();
-      }
-      dragSrcIdx=null;
     });
     list.appendChild(card);
   });
@@ -810,42 +795,50 @@ function renderStartPanel(){
     <button class="link-btn" onclick="openBacklogDateModal()">${ICONS.calendar} Vergangenes Training nachtragen</button>`;
 }
 
-// Touch-based drag & drop for mobile
-let touchDragIdx=null,touchClone=null,touchTarget=null;
-document.addEventListener('touchstart',e=>{
-  if(e.target.tagName==='INPUT'||e.target.tagName==='SELECT'||e.target.tagName==='BUTTON')return;
-  const handle=e.target.closest('.drag-handle');
-  if(!handle)return;
-  const card=handle.closest('.exercise-card');
-  if(!card)return;
-  touchDragIdx=parseInt(card.dataset.idx);
-  touchClone=card.cloneNode(true);
-  touchClone.classList.add('drag-clone');
-  touchClone.style.width=card.offsetWidth+'px';
-  document.body.appendChild(touchClone);
+// ── REORDER (drag handle) ──
+// Pointer events: one path for touch and mouse. While dragging, open cards
+// collapse (CSS .reordering) so the list is short; the card moves in the DOM
+// as the pointer passes the other cards' midpoints and follows the finger.
+// Near the top or the save bar the page scrolls along. The new order is
+// applied once at the end.
+let reorder=null;
+const exerciseList=document.getElementById('exercise-list');
+exerciseList.addEventListener('pointerdown',e=>{
+  const card=e.target.closest('.drag-handle')?.closest('.exercise-card');
+  if(!card||reorder||e.button>0)return;
+  e.preventDefault();
+  exerciseList.setPointerCapture(e.pointerId); // on the list: the card itself moves in the DOM
+  exerciseList.classList.add('reordering');
   card.classList.add('dragging');
-},{passive:true});
-document.addEventListener('touchmove',e=>{
-  if(touchDragIdx===null)return;
-  const t=e.touches[0];
-  if(touchClone){touchClone.style.setProperty('--x',(t.clientX-40)+'px');touchClone.style.setProperty('--y',(t.clientY-30)+'px');}
-  const el=document.elementFromPoint(t.clientX,t.clientY);
-  const card=el?.closest?.('.exercise-card');
-  document.querySelectorAll('.exercise-card').forEach(c=>c.classList.remove('drag-over'));
-  if(card&&parseInt(card.dataset.idx)!==touchDragIdx)card.classList.add('drag-over');
-  touchTarget=card?parseInt(card.dataset.idx):null;
-},{passive:true});
-document.addEventListener('touchend',()=>{
-  if(touchDragIdx===null)return;
-  if(touchClone){touchClone.remove();touchClone=null;}
-  document.querySelectorAll('.exercise-card').forEach(c=>{c.classList.remove('dragging','drag-over');});
-  if(touchTarget!==null&&touchTarget!==touchDragIdx){
-    const moved=currentSession.exercises.splice(touchDragIdx,1)[0];
-    currentSession.exercises.splice(touchTarget,0,moved);
-    scheduleSave();render();
-  }
-  touchDragIdx=null;touchTarget=null;
+  reorder={card,y:e.clientY,raf:0};
+  placeDragged();
+  reorder.raf=requestAnimationFrame(autoScroll);
 });
+exerciseList.addEventListener('pointermove',e=>{if(reorder){reorder.y=e.clientY;placeDragged();}});
+exerciseList.addEventListener('lostpointercapture',()=>{
+  if(!reorder)return;
+  cancelAnimationFrame(reorder.raf);reorder=null;
+  // After a re-render meanwhile the list is in stored order again: no change
+  const order=[...exerciseList.children].map(c=>+c.dataset.idx);
+  if(order.some((v,i)=>v!==i)){currentSession.exercises=order.map(i=>currentSession.exercises[i]);scheduleSave();}
+  exerciseList.classList.remove('reordering');
+  render();
+});
+function placeDragged(){
+  const {card,y}=reorder;
+  const next=[...exerciseList.children].find(c=>{if(c===card)return false;const r=c.getBoundingClientRect();return r.top+r.height/2>y;})||null;
+  if(card.nextElementSibling!==next)exerciseList.insertBefore(card,next);
+  card.style.transform='';
+  const r=card.getBoundingClientRect();
+  card.style.transform=`translateY(${y-r.top-r.height/2}px)`;
+}
+function autoScroll(){
+  if(!reorder)return;
+  const bottom=(document.querySelector('.savebar')?.getBoundingClientRect().top||innerHeight)-40;
+  const over=reorder.y<80?reorder.y-80:reorder.y>bottom?reorder.y-bottom:0;
+  if(over){window.scrollBy(0,Math.max(-14,Math.min(14,over/4)));placeDragged();}
+  reorder.raf=requestAnimationFrame(autoScroll);
+}
 
 window.toggleEx = function(i){currentSession.exercises[i].open=!currentSession.exercises[i].open;render();}
 window.updateSet = function(ei,si,field,input){

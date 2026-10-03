@@ -172,11 +172,11 @@ button{cursor:pointer;-webkit-tap-highlight-color:transparent}
 .ex-foot{display:flex;justify-content:space-between;align-items:center;margin-top:12px;font-size:14px;color:var(--muted)}
 .ex-foot b{color:var(--text);font-weight:700}
 .ex-remove{border:0;background:none;color:var(--danger);font-weight:600;font-size:14px;padding:6px 0}
-.drag-handle{color:var(--faint);touch-action:none;display:grid;cursor:grab;margin-left:-4px}
+.drag-handle{color:var(--faint);touch-action:none;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none;display:grid;cursor:grab;padding:12px 6px 12px 14px;margin:-12px -6px -12px -14px}
 .drag-handle:active{cursor:grabbing}
-.exercise-card.dragging{opacity:0.5;transform:scale(0.98)}
-.exercise-card.drag-over{box-shadow:inset 0 0 0 2px var(--ink)}
-.drag-clone{position:fixed;left:0;top:0;z-index:200;opacity:0.9;pointer-events:none;transform:translate(var(--x,0),var(--y,0)) scale(0.95);box-shadow:var(--shadow)}
+.reordering{-webkit-user-select:none;user-select:none}
+.reordering .exercise-body{display:none}
+.exercise-card.dragging{z-index:5;transition:none;animation:none;box-shadow:var(--shadow),inset 0 0 0 1.5px var(--ink);cursor:grabbing}
 .actions{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:14px}
 .notes{display:block;width:100%;min-height:100px;padding:14px;border-radius:var(--radius);border:1px solid var(--card-line);background:var(--surface);font-size:16px;resize:vertical;outline:none}
 .notes::placeholder{color:var(--faint)}
@@ -324,7 +324,6 @@ button{cursor:pointer;-webkit-tap-highlight-color:transparent}
 .heatmap-grid .heatmap-cell{animation:cellIn 0.3s var(--ease) backwards}
 .pr-flash{animation:prFlash 2s ease}
 .pr-burst::after{content:'';position:absolute;inset:0;border-radius:var(--radius);background:radial-gradient(circle,var(--soft),transparent 70%);animation:prBurst 0.8s ease-out forwards;pointer-events:none}
-.drag-clone,.drag-clone *{animation:none!important}
 @media (prefers-reduced-motion:reduce){
   *,*::before,*::after{animation-duration:0.01ms!important;animation-iteration-count:1!important;transition-duration:0.01ms!important}
 }

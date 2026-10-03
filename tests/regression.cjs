@@ -24,7 +24,12 @@ function runtime(srv = server()) {
     return {style: {setProperty() {}}, dataset: {}, value: '', innerHTML: '', textContent: '', children: [], listeners: {},
       classList: {add(...xs) { xs.forEach(x => classes.add(x)); }, remove(...xs) { xs.forEach(x => classes.delete(x)); }, contains(x) { return classes.has(x); }, toggle(x, on) { if (on === undefined) on = !classes.has(x); on ? classes.add(x) : classes.delete(x); return on; }},
       addEventListener(type, fn) { (this.listeners[type] ??= []).push(fn); },
-      appendChild(child) { this.children.push(child); this.lastElementChild = child; },
+      appendChild(child) { this.children.push(child); this.lastElementChild = child; child.parentNode = this; },
+      // Minimal layout for the reorder code: children stacked 60px apart
+      insertBefore(child, ref) { this.children.splice(this.children.indexOf(child), 1); this.children.splice(ref ? this.children.indexOf(ref) : this.children.length, 0, child); },
+      get nextElementSibling() { const s = this.parentNode?.children || []; return s[s.indexOf(this) + 1] || null; },
+      getBoundingClientRect() { const s = this.parentNode?.children || []; return {top: s.indexOf(this) * 60, height: 60}; },
+      setPointerCapture() {},
       querySelector() { return null; }, querySelectorAll() { return []; }, setAttribute() {}, getAttribute() { return null; }, removeAttribute() {}, focus() {},
       get offsetWidth() { return this.style.display === 'none' ? 0 : 360; },
       get offsetHeight() { return this.style.display === 'none' ? 0 : 220; },
@@ -555,6 +560,31 @@ test('V3 notes without exercises stay reachable (today and history)', async () =
   r.run("showDetail('2026-09-29')");
   assert.ok(r.nodes.get('detail-notes-wrap').innerHTML.includes('Knie zwickt'));
   assert.equal(r.nodes.get('detail-copy').style.display, 'none'); // nothing to copy
+});
+
+test('V3 dragging the handle reorders; a tap or a re-render meanwhile changes nothing', async () => {
+  const srv = server();
+  srv.docs.set(`users/A/sessions/${TODAY}`, {exercises: ['A', 'B', 'C'].map(name => ({name, sets: [{kg: '10', reps: '5'}]})), notes: ''});
+  const r = runtime(srv);
+  await r.login('A');
+  const list = r.nodes.get('exercise-list'), on = (type, e) => list.listeners[type].forEach(fn => fn(e));
+  const cards = () => list.children.slice(-3); // the fake innerHTML='' keeps old children
+  const grab = i => { const card = cards()[i]; on('pointerdown', {button: 0, pointerId: 1, clientY: i * 60 + 30, preventDefault() {}, target: {closest: q => q === '.drag-handle' ? {closest: () => card} : null}}); };
+  const names = () => r.run('currentSession.exercises.map(e=>e.name).join()');
+  list.children = cards();
+  grab(0); on('lostpointercapture', {}); // tap: nothing moves
+  assert.equal(names(), 'A,B,C');
+  list.children = cards();
+  grab(0); on('pointermove', {clientY: 170}); on('lostpointercapture', {});
+  assert.equal(names(), 'B,C,A');
+  r.tick(); // autosave
+  assert.deepEqual(srv.docs.get(`users/A/sessions/${TODAY}`).exercises.map(e => e.name), ['B', 'C', 'A']);
+  list.children = cards();
+  grab(2); on('pointermove', {clientY: 10});
+  r.run('render()'); list.children = cards(); // remote change re-renders mid-drag
+  on('lostpointercapture', {});
+  assert.equal(names(), 'B,C,A');
+  assert.ok(!list.classList.contains('reordering'));
 });
 
 test('F12 the drag handle no longer swallows touchstart', () => {
