@@ -98,12 +98,11 @@ button{cursor:pointer;-webkit-tap-highlight-color:transparent}
 
 /* ── SAVE BAR / SYNC ── */
 .savebar{position:fixed;left:50%;transform:translateX(-50%);width:calc(100% - 24px);max-width:496px;bottom:calc(env(safe-area-inset-bottom,0px) + 86px);z-index:40;display:flex;align-items:center;gap:12px;padding:8px 8px 8px 16px;background:var(--surface);border:1px solid var(--line);border-radius:18px;box-shadow:var(--shadow)}
-.sync-bar{flex:1;min-width:0;font-size:15px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.sync-bar::before{content:'';display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:10px;vertical-align:2px;background:var(--good)}
-.sync-bar.syncing::before{background:var(--muted);animation:pulse 1.2s ease-in-out infinite}
-.sync-bar.error{color:var(--danger)}
-.sync-bar.error::before{background:var(--danger)}
-.sync-toast{display:none;position:fixed;left:50%;transform:translateX(-50%);bottom:calc(env(safe-area-inset-bottom,0px) + 164px);z-index:150;width:max-content;max-width:calc(100% - 32px);padding:12px 16px;border-radius:14px;background:var(--danger);color:#fff;font-size:15px;font-weight:500;text-align:center;box-shadow:var(--shadow)}
+.draft-progress{flex:1;min-width:0;font-size:15px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.draft-progress::before{content:'';display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:10px;vertical-align:2px;background:var(--faint)}
+.draft-progress.ready::before{background:var(--good)}
+.sync-toast{display:none;position:fixed;left:50%;transform:translateX(-50%);bottom:calc(env(safe-area-inset-bottom,0px) + 164px);z-index:150;width:max-content;max-width:calc(100% - 32px);padding:12px 16px;border-radius:14px;background:var(--text);color:var(--bg);font-size:15px;font-weight:500;text-align:center;box-shadow:var(--shadow)}
+.sync-toast.error{background:var(--danger);color:#fff}
 .sync-toast.show{display:block;animation:fadeIn 0.2s ease}
 
 /* ── TODAY: START PANEL ── */
@@ -124,13 +123,14 @@ button{cursor:pointer;-webkit-tap-highlight-color:transparent}
 .stepper{display:flex;align-items:center;gap:4px;background:var(--surface2);border-radius:12px;padding:3px}
 .stepper button{width:38px;height:34px;border:0;border-radius:9px;background:var(--surface);font-size:20px;font-weight:600}
 .stepper b{min-width:30px;text-align:center}
-.tpl-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px}
-.tpl-tile{position:relative;display:flex;flex-direction:column;gap:2px;text-align:left;padding:14px;min-height:78px;background:var(--surface);border:1px solid var(--card-line);border-radius:16px;transition:transform 0.12s}
-.tpl-tile:active,.list-row:active,.session-card:active,.template-card:active{transform:scale(0.98)}
-.tpl-tile-name{font-weight:700;font-size:17px;padding-right:32px;overflow-wrap:anywhere}
-.tpl-tile-meta{font-size:14px;color:var(--muted)}
-.tpl-tile-play{position:absolute;right:12px;top:12px;width:28px;height:28px;border-radius:50%;background:var(--soft);color:var(--ink);display:grid;place-items:center}
-.tpl-tile-play .icon{width:14px;height:14px}
+.start-btn{height:56px;font-size:17px;margin-top:12px}
+.done-card{padding:14px;margin-top:12px}
+.done-head{display:flex;align-items:center;gap:12px;margin-bottom:12px}
+.done-ico{width:40px;height:40px;border-radius:12px;background:var(--accent);color:var(--on-accent);display:grid;place-items:center;flex:none}
+.done-card .detail-actions{margin-bottom:0}
+.link-btn{display:flex;align-items:center;justify-content:center;gap:8px;width:100%;margin-top:8px;padding:12px;border:0;background:none;color:var(--muted);font-weight:500;font-size:16px}
+.link-btn--danger{color:var(--danger)}
+.list-row:active,.session-card:active,.template-card:active{transform:scale(0.98)}
 .list{overflow:hidden}
 .list-row{display:flex;align-items:center;gap:12px;width:100%;padding:14px;border:0;background:none;text-align:left;transition:transform 0.12s}
 .list-row+.list-row{border-top:1px solid var(--line)}
@@ -139,7 +139,6 @@ button{cursor:pointer;-webkit-tap-highlight-color:transparent}
 .list-title{display:block;font-weight:600;font-size:16px}
 .list-sub{display:block;font-size:14px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .chev{color:var(--faint);display:grid}
-.link-btn{display:flex;align-items:center;justify-content:center;gap:8px;width:100%;margin-top:12px;padding:12px;border:0;background:none;color:var(--muted);font-weight:500;font-size:16px}
 
 /* ── TODAY: TRAINING ── */
 .summary{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:16px}
@@ -148,6 +147,8 @@ button{cursor:pointer;-webkit-tap-highlight-color:transparent}
 .summary-item span{font-size:13px;color:var(--muted)}
 .exercise-card{position:relative;margin-bottom:10px;background:var(--surface);border:1px solid var(--card-line);border-radius:var(--radius);transition:opacity 0.2s,transform 0.2s}
 .exercise-card.has-pr{box-shadow:inset 0 0 0 1.5px var(--ink)}
+.ex-check{width:36px;height:36px;flex:none;display:grid;place-items:center;padding:0;border-radius:50%;border:2px solid var(--line);background:none;color:transparent;transition:background 0.15s,border-color 0.15s}
+.exercise-card.done .ex-check{background:var(--accent);border-color:var(--accent);color:var(--on-accent)}
 .exercise-header{display:flex;align-items:center;gap:10px;padding:14px;cursor:pointer;-webkit-tap-highlight-color:transparent}
 .ex-title{flex:1;min-width:0}
 .exercise-name{font-weight:700;font-size:18px;overflow-wrap:anywhere}
@@ -316,7 +317,6 @@ button{cursor:pointer;-webkit-tap-highlight-color:transparent}
 @keyframes barFill{from{width:0}}
 @keyframes badgePop{0%{transform:scale(0)}70%{transform:scale(1.12)}100%{transform:scale(1)}}
 @keyframes bodyExpand{from{opacity:0;transform:translateY(-4px)}to{opacity:1;transform:none}}
-@keyframes pulse{50%{opacity:0.3}}
 @keyframes prBurst{from{opacity:0.9;transform:scale(0.6)}to{opacity:0;transform:scale(1.35)}}
 @keyframes prFlash{0%{box-shadow:0 0 0 3px var(--accent)}100%{box-shadow:none}}
 .anim-in{animation:cardIn 0.45s var(--ease) backwards}

@@ -133,8 +133,6 @@ let currentKey = getTodayKey(); // day the open training belongs to
 let editingTemplate = null;
 let tplSeen; // stamp of the stored template the editor started from
 let pendingImport = null; // exercises waiting for the add/replace choice
-let saveTimer = null;
-let lastEditAt = 0;
 // Every auth change bumps authGen; async results that started under an older
 // generation are dropped. activeUid is set only once the account's data has
 // loaded — all writes go there, so nothing is saved before (or after) that.
@@ -146,7 +144,7 @@ window.signInWithGoogle = async () => {
   try { await signInWithPopup(auth, provider); }
   catch(e) { document.getElementById('login-error').textContent = 'Anmeldung fehlgeschlagen. Bitte erneut versuchen.'; }
 };
-window.signOut = async () => { flushSave(); await fbSignOut(auth); };
+window.signOut = async () => { await fbSignOut(auth); };
 
 // Theme: 'auto' follows the system via the CSS media query, 'light'/'dark'
 // override it (data-theme). The head script applies a stored override before
@@ -234,8 +232,7 @@ window.retryLoad = enterApp;
 function resetAccountState() {
   activeUid = null;
   unwatch();
-  setCurrentSession(null); // also cancels a pending autosave
-  currentKey = getTodayKey(); lastEditAt = 0;
+  setDraft(null); // memory only: the stored draft stays for this account's next login
   sessions = {}; templates = []; customExercises = []; goals = {trainDays: 3};
   invalidatePRCache();
   editingTemplate = null; pendingImport = null; currentDetailKey = null;
@@ -246,22 +243,15 @@ function resetAccountState() {
 }
 
 // ── FIRESTORE ──
-let statusTimer = null, toastTimer = null;
-// resetMs returns the bar to the neutral "Bereit" after a moment. Errors also
-// raise a toast, because the sync bar is only visible on the Heute page.
-function setSyncStatus(status, msg, resetMs) {
-  clearTimeout(statusTimer);
-  const bar = document.getElementById('sync-bar');
-  bar.className = 'sync-bar ' + status;
-  bar.textContent = msg;
-  if(resetMs) statusTimer = setTimeout(() => setSyncStatus('', 'Alles gesichert'), resetMs);
-  if(status === 'error') {
-    const toast = document.getElementById('sync-toast');
-    toast.textContent = msg;
-    toast.classList.add('show');
-    clearTimeout(toastTimer);
-    toastTimer = setTimeout(() => toast.classList.remove('show'), 4000);
-  }
+let toastTimer = null;
+// Short message above the bottom bar, on every page (errors in red)
+function toast(msg, error) {
+  const el = document.getElementById('sync-toast');
+  el.textContent = msg;
+  el.classList.toggle('error', !!error);
+  el.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => el.classList.remove('show'), error ? 4000 : 2500);
 }
 
 // Firestore is a trust boundary: stored documents are coerced into the shape
@@ -304,9 +294,7 @@ async function loadAllData() {
     ]);
     if(gen !== authGen) return false;
     applySessions(sessSnap); applyTemplates(tplSnap); applyCustom(custSnap); applyGoals(goalsSnap);
-    currentKey = getTodayKey();
-    setCurrentSession(sessions[currentKey]);
-    setSyncStatus('synced', 'Synchronisiert', 2000);
+    setDraft(readDraft(uid));
     return true;
   } catch(e) {
     console.error('loadAllData failed', e);
@@ -342,11 +330,9 @@ function watchRemote(uid) {
     }, e => console.error('live sync failed', e)));
   };
   watch(collection(db, 'users', uid, 'sessions'), (snap, first) => {
-    const known = stamp(sessions[currentKey]);
     applySessions(snap);
     // The first snapshot lists every doc as new, so it can't say what changed
     if(!first && !snap.docChanges().some(c => c.type === 'removed' || foreign(c.doc))) return;
-    if(stamp(sessions[currentKey]) !== known) adoptRemoteSession();
     refreshActivePage();
   });
   const watchDoc = (name, apply) => watch(doc(db, 'users', uid, 'data', name), snap => {
@@ -357,18 +343,11 @@ function watchRemote(uid) {
   watchDoc('custom', applyCustom);
   watchDoc('goals', applyGoals);
 }
-// Another device changed the open training: adopt it, unless this tab has
-// unsaved edits — then the user decides which version wins.
-function adoptRemoteSession() {
-  if(saveTimer && !confirm('Dieses Training wurde gerade auf einem anderen Gerät geändert.\n\nOK: Version vom anderen Gerät übernehmen\nAbbrechen: deine Änderungen behalten (überschreibt die andere Version)')) return;
-  setCurrentSession(sessions[currentKey]);
-  render();
-}
-// Re-render list pages after remote changes; editors keep their drafts and
-// an open training isn't re-rendered under the user's fingers
+// Re-render list pages after remote changes; editors and a running training
+// keep their drafts (a finish asks if the stored day changed meanwhile)
 function refreshActivePage() {
   const page = document.querySelector('.page.active')?.id;
-  if(page === 'page-today' && !currentSession.exercises.length) render();
+  if(page === 'page-today' && !drafting) render();
   else if(page === 'page-history') renderHistory();
   else if(page === 'page-templates') renderTemplates();
   else if(page === 'page-tpl-detail') renderTemplateDetail();
@@ -379,19 +358,12 @@ function refreshActivePage() {
 // Firestore applies a write to its (offline-persistent) local cache at once
 // but resolves the promise only when the server acknowledged it — offline it
 // stays pending until the connection is back. So local state is updated
-// first and the UI never waits for the ack; trackWrite only drives the sync
-// status and reports rejections. Resolves true/false, never rejects.
-let pendingWrites = 0;
-function trackWrite(write, label, doneMsg = 'Gespeichert') {
+// first and the UI never waits for the ack; trackWrite only reports
+// rejections. Resolves true/false, never rejects.
+function trackWrite(write, label) {
   const gen = authGen;
-  pendingWrites++;
-  setSyncStatus('syncing', navigator.onLine ? 'Wird gespeichert…' : 'Offline gesichert, wird später synchronisiert');
   return new Promise(res => res(write())).then(() => true, e => { console.error(label + ' fehlgeschlagen', e); return false; }).then(ok => {
-    pendingWrites--;
-    if(gen !== authGen) return ok;
-    if(!ok) setSyncStatus('error', label + ' fehlgeschlagen', 3000);
-    // Newer edits still unsent or in flight: keep showing "pending"
-    else if(!pendingWrites && !saveTimer) setSyncStatus('synced', doneMsg, 1500);
+    if(!ok && gen === authGen) toast(label + ' fehlgeschlagen', true);
     return ok;
   });
 }
@@ -404,18 +376,6 @@ function settleWrite(tracked) {
   return Promise.race([tracked, new Promise(r => setTimeout(() => r(null), ACK_WAIT_MS))]);
 }
 
-// Saves the open training under the day it belongs to (currentKey, not "now":
-// a session left open past midnight must not land on the next day). The
-// snapshot is taken synchronously, so later edits are never mistaken as saved.
-function saveSession() {
-  cancelSave();
-  if(!activeUid) return Promise.resolve(false);
-  const key = currentKey, snap = structuredClone(currentSession);
-  sessions[key] = snap;
-  invalidatePRCache();
-  syncTemplatesWithBests();
-  return trackWrite(() => setDoc(doc(db, 'users', activeUid, 'sessions', key), {...snap, writer: CLIENT_ID}), 'Speichern');
-}
 function saveUserDoc(name, payload, label) {
   if(!activeUid) return Promise.resolve(false);
   return trackWrite(() => setDoc(doc(db, 'users', activeUid, 'data', name), {...payload, writer: CLIENT_ID}), label);
@@ -423,39 +383,73 @@ function saveUserDoc(name, payload, label) {
 function saveTemplates()       { return saveUserDoc('templates', {list: templates},        'Vorlagen speichern'); }
 function saveCustomExercises() { return saveUserDoc('custom',    {list: customExercises}, 'Übungen speichern'); }
 function saveGoals()           { return saveUserDoc('goals',     goals,                   'Ziele speichern'); }
-function scheduleSave() {
-  lastEditAt = Date.now();
-  if(!saveTimer) setSyncStatus('syncing', 'Wird gesichert…');
-  clearTimeout(saveTimer);
-  saveTimer = setTimeout(saveSession, 1200);
-}
-function cancelSave() { clearTimeout(saveTimer); saveTimer = null; }
-// Push a pending autosave out now (app goes to background, logout, day change)
-function flushSave() { if(saveTimer) saveSession(); }
-// Replace the open training (dropping unsaved edits) and sync the notes field
-function setCurrentSession(s) {
-  if(saveTimer && !pendingWrites) setSyncStatus('', 'Alles gesichert');
-  cancelSave();
-  currentSession = structuredClone(s || {exercises:[], notes:''});
-  document.getElementById('notes').value = currentSession.notes || '';
-}
-
-// A training stays bound to the day it was started, so one running past
-// midnight stays in one piece. The next day starts once the app is resumed
-// on a later day and the training had no edits for ROLLOVER_IDLE_MS.
-const ROLLOVER_IDLE_MS = 2 * 60 * 60 * 1000;
-function rolloverIfNewDay() {
-  if(!activeUid || currentKey === getTodayKey() || Date.now() - lastEditAt < ROLLOVER_IDLE_MS) return;
-  flushSave(); // still saved under the old day
-  currentKey = getTodayKey();
-  setCurrentSession(sessions[currentKey]);
+// ── TODAY: DRAFT ──
+// A training is a draft on this device until "Abschließen": kept in
+// localStorage per account (survives closing the app), never synced and not
+// counted anywhere. It stays bound to the day it was started, so one running
+// past midnight — or left unfinished — keeps its date until finished or
+// discarded. draftBase: stamp of the stored day it started from, to ask on
+// finish if that day was saved elsewhere meanwhile.
+let drafting = false, draftBase = null;
+function setDraft(d) { // memory and screen only
+  drafting = !!d;
+  currentKey = d ? d.key : getTodayKey();
+  draftBase = d ? d.base : null;
+  currentSession = d ? d.session : {exercises:[], notes:''};
+  document.getElementById('notes').value = currentSession.notes;
   renderDateHeader();
-  render();
 }
+// storedDraft: what this tab last wrote or read; anything else stored came from another tab
+let storedDraft = null, draftStoreFailed = false;
+function storeDraft() {
+  if(!drafting || !activeUid) return;
+  const json = JSON.stringify({key: currentKey, base: draftBase, session: currentSession});
+  try { localStorage.setItem('draft:' + activeUid, json); storedDraft = json; draftStoreFailed = false; }
+  catch(e) { // full or blocked: the draft lives in memory only — say so once
+    if(!draftStoreFailed) toast('Entwurf kann auf diesem Gerät nicht gesichert werden – schließ das Training ab, bevor du die App schließt', true);
+    draftStoreFailed = true;
+  }
+}
+function dropStoredDraft() { try { localStorage.removeItem('draft:' + activeUid); } catch(e) {} storedDraft = null; }
+// localStorage is user-editable: same cleaning as stored trainings
+function readDraft(uid) {
+  storedDraft = null;
+  try {
+    const d = JSON.parse(storedDraft = localStorage.getItem('draft:' + uid));
+    if(d && DATE_KEY.test(d.key) && d.session) return {key: d.key, base: typeof d.base === 'string' ? d.base : null,
+      session: {exercises: cleanExercises(d.session.exercises), notes: typeof d.session.notes === 'string' ? d.session.notes : ''}};
+  } catch(e) {}
+  return null;
+}
+// Starts from today's stored training, if any (all its exercises done), so
+// adding to or editing a saved day never drops what's there
+function startDraft() {
+  const key = getTodayKey(), saved = sessions[key];
+  setDraft({key, base: stamp(saved) || null, session: {
+    exercises: saved ? saved.exercises.map(e => ({...structuredClone(e), done: true, open: false})) : [],
+    notes: saved?.notes || ''}});
+  storeDraft();
+}
+// Tabs of one account share the stored draft: another tab changed, finished or
+// discarded it — take that over
+function adoptForeignDraft() {
+  if(!activeUid) return false;
+  try { if(localStorage.getItem('draft:' + activeUid) === storedDraft) return false; } catch(e) { return false; }
+  setDraft(readDraft(activeUid)); render();
+  return true;
+}
+// Before finishing or discarding: never save or drop a state this tab hasn't shown
+function draftChangedElsewhere() {
+  if(!adoptForeignDraft()) return false;
+  toast('Training wurde in einem anderen Tab geändert – prüf den neuen Stand', true);
+  return true;
+}
+window.addEventListener('storage', e => { if(e.key === 'draft:' + activeUid) adoptForeignDraft(); });
 document.addEventListener('visibilitychange', () => {
-  // Hidden: save now instead of after the debounce — the app may get killed
-  if(document.visibilityState === 'hidden') flushSave();
-  else rolloverIfNewDay();
+  // adopt: a tab in the background can miss storage events
+  if(document.visibilityState !== 'visible' || !activeUid || adoptForeignDraft()) return;
+  // Back on a later day with no training running: show that day
+  if(!drafting && currentKey !== getTodayKey()) { setDraft(null); render(); }
 });
 
 // Two-letter initials from the display name (first + last), else first email char
@@ -480,7 +474,7 @@ function initUI() {
   render();
   staggerIn('exercise-list');
 }
-// The header date shows the day the open training belongs to
+// The header shows the day of the running training (else today)
 function renderDateHeader() {
   const day = new Date(currentKey + 'T12:00:00');
   document.getElementById('today-date').textContent = DAYS_FULL[(day.getDay()+6)%7] + ', ' + day.getDate() + '. ' + monthsFull[day.getMonth()];
@@ -490,7 +484,7 @@ function renderDateHeader() {
 // login — so they never stack up across sign-out / sign-in.
 document.getElementById('notes').addEventListener('input', e => {
   currentSession.notes = e.target.value;
-  scheduleSave();
+  storeDraft();
 });
 // Delegated picker handlers — read data-name to avoid building JS strings from user input
 [
@@ -602,6 +596,11 @@ function getTodayBest(ei){
   return best;
 }
 
+// A new record beats the standing best: heavier, or same weight with more
+// reps. Equal is none (templates come prefilled with the best values), and
+// without an earlier best there is nothing to beat yet.
+const beatsPR=(kg,reps,pr)=>!!pr&&(kg>pr.kg||(kg===pr.kg&&reps>pr.reps));
+
 function calcExVol(ex){return ex.sets.reduce((s,set)=>s+(parseFloat(set.kg)||0)*(parseFloat(set.reps)||0),0);}
 
 // One-shot flag: the next updateStats() call animates the numbers (set before
@@ -617,12 +616,12 @@ function updateStats(){
     if(animate)countUp(el,val,fmt);
     else{el.dataset.val=val;el.textContent=fmt(val);}
   });
-  const fb=document.getElementById('finish-btn');
-  if(fb){
-    const hasExercises=currentSession.exercises.length>0;
-    fb.disabled=!hasExercises;
-    fb.classList.toggle('disabled',!hasExercises);
-  }
+  // Finishing needs every exercise ticked off
+  const n=currentSession.exercises.length,done=currentSession.exercises.filter(e=>e.done).length;
+  const progress=document.getElementById('draft-progress');
+  progress.textContent=!n?'Noch keine Übung':done===n?'Alles erledigt':`${done} von ${n} erledigt`;
+  progress.classList.toggle('ready',!!n&&done===n);
+  document.getElementById('finish-btn').disabled=!n||done<n;
 }
 
 // Shared empty-state HTML — ICONS key + title + optional subtitle.
@@ -651,7 +650,7 @@ function setRows(sets,ei,updateFn,removeFn,isPRSet=()=>false,ghost=null){
 const setsLabel=n=>n+(n===1?' Satz':' Sätze');
 
 // Shared exercise-card renderer used by today / backlog / detail views.
-// opts: { idx, draggable, readonly, showDelete, namespace, badgeHtml, hasPRClass, flashAnimation, isPRSet, subOpen, ghost }
+// opts: { idx, draggable, readonly, showDelete, namespace, badgeHtml, hasPRClass, flashAnimation, isPRSet, subOpen, ghost, checkable }
 // subOpen: header subline while expanded (static markup / numbers only)
 function renderExerciseCard(ex,opts){
   const {
@@ -667,6 +666,7 @@ function renderExerciseCard(ex,opts){
     isPRSet=()=>false,
     subOpen='',
     ghost=null,
+    checkable=false,
   }=opts||{};
   const vol=Math.round(calcExVol(ex)).toLocaleString('de');
   const card=document.createElement('div');
@@ -686,7 +686,7 @@ function renderExerciseCard(ex,opts){
   const fn=namespace==='backlog'
     ?{update:'updateBacklogSet',toggle:'toggleBacklogEx',addSet:'addBacklogSet',removeSet:'removeBacklogSet',remove:'removeBacklogEx'}
     :{update:'updateSet',toggle:'toggleEx',addSet:'addSet',removeSet:'removeSet',remove:'removeEx'};
-  card.className='exercise-card'+(hasPRClass?' has-pr':'');
+  card.className='exercise-card'+(hasPRClass?' has-pr':'')+(checkable&&ex.done?' done':'');
   if(draggable)card.dataset.idx=idx;
   if(flashAnimation)card.classList.add('pr-flash');
   // Reordering starts on pointerdown (listener on #exercise-list); a tap on the handle doesn't toggle the card
@@ -696,6 +696,7 @@ function renderExerciseCard(ex,opts){
     <div class="exercise-header" role="button" tabindex="0" aria-expanded="${!!ex.open}" onclick="${fn.toggle}(${idx})">
       ${dragHandle}
       <div class="ex-title"><div class="exercise-name">${escapeHtml(ex.name)}</div><div class="ex-sub">${sub}</div></div>${badgeHtml}
+      ${checkable?`<button class="ex-check" onclick="event.stopPropagation();toggleDone(${idx})" aria-pressed="${!!ex.done}" aria-label="${escapeHtml(ex.name)} erledigt">${ICONS.check}</button>`:''}
       <span class="exercise-toggle${ex.open?' open':''}">${ICONS.chevronDown}</span>
     </div>
     ${ex.open?`<div class="exercise-body">
@@ -708,17 +709,16 @@ function renderExerciseCard(ex,opts){
 }
 
 function render(){
-  // Notes alone keep the training view, so they stay reachable
-  const empty=!currentSession.exercises.length&&!currentSession.notes.trim();
-  document.getElementById('start-panel').style.display=empty?'':'none';
-  document.getElementById('training-panel').style.display=empty?'none':'';
-  if(empty)renderStartPanel();
+  // No training running: start button, or today's stored training
+  document.getElementById('start-panel').style.display=drafting?'none':'';
+  document.getElementById('training-panel').style.display=drafting?'':'none';
+  if(!drafting)renderStartPanel();
   const list=document.getElementById('exercise-list');
   list.innerHTML='';
   currentSession.exercises.forEach((ex,ei)=>{
     const pr=getExPR(ex.name);
     const todayBest=getTodayBest(ei);
-    const isNewPR=todayBest&&(!pr||todayBest.kg>pr.kg||(todayBest.kg===pr.kg&&todayBest.reps>pr.reps));
+    const isNewPR=!!todayBest&&beatsPR(todayBest.kg,todayBest.reps,pr);
     const card=renderExerciseCard(ex,{
       idx:ei,
       draggable:true,
@@ -728,8 +728,9 @@ function render(){
       subOpen:pr?`Bestwert ${pr.kg} kg × ${pr.reps}`:'Noch kein Bestwert',
       hasPRClass:isNewPR,
       flashAnimation:isNewPR,
-      isPRSet:(si,sKg,sR)=>sKg>0&&(!pr||sKg>pr.kg||(sKg===pr.kg&&sR>=pr.reps)),
+      isPRSet:(si,sKg,sR)=>beatsPR(sKg,sR,pr),
       ghost:lastSets(ex.name,currentKey),
+      checkable:true,
     });
     list.appendChild(card);
   });
@@ -777,23 +778,40 @@ function weekCardHtml(full){
   </section>`;
 }
 
-// Empty day: week progress and the ways to start — a template, a copy of an
-// earlier training, or empty
+// No training running: week progress plus either the start button or
+// today's stored training (view it, or edit it as a new draft)
 function renderStartPanel(){
-  const past=trainedKeysBefore(currentKey);
-  const row=(icon,title,sub,onclick)=>`<button class="list-row" onclick="${onclick}"><span class="list-ico">${ICONS[icon]}</span><span class="list-main"><span class="list-title">${title}</span><span class="list-sub">${sub}</span></span><span class="chev">${ICONS.chevronRight}</span></button>`;
-  const tiles=templates.map(t=>`<button class="tpl-tile" onclick="startTemplate(${tplRef(t)})"><span class="tpl-tile-play">${ICONS.play}</span><span class="tpl-tile-name">${escapeHtml(t.name)}</span><span class="tpl-tile-meta">${t.exercises.length} Übungen</span></button>`).join('');
-  // Date keys are validated (DATE_KEY), safe inside the handler
-  document.getElementById('start-panel').innerHTML=`${weekCardHtml(false)}
-    <div class="sec-label">Training starten</div>
-    ${tiles?`<div class="tpl-grid">${tiles}</div>`:''}
-    <div class="card list">
-      ${past.length?row('repeat','Letztes Training wiederholen',shortDate(past[0])+' · '+namesPreview(sessions[past[0]]),`copySessionToToday('${past[0]}')`):''}
-      ${past.length?row('copy','Aus dem Verlauf kopieren','Ein früheres Training als Basis','openLoadModal(true)'):''}
-      ${row('plus','Leer starten','Übungen einzeln hinzufügen','openExerciseModal()')}
-    </div>
-    <button class="link-btn" onclick="openBacklogDateModal()">${ICONS.calendar} Vergangenes Training nachtragen</button>`;
+  const s=sessions[currentKey];
+  let main=`<button class="btn btn--primary btn--block start-btn" onclick="openStartModal()">${ICONS.play} Training starten</button>`;
+  if(s&&s.exercises.length){
+    const {sets,vol}=sessionTotals(s);
+    main=`<section class="card done-card">
+      <div class="done-head"><span class="done-ico">${ICONS.check}</span><span class="list-main"><span class="list-title">Training gespeichert</span><span class="list-sub">${s.exercises.length} Übungen · ${setsLabel(sets)} · ${Math.round(vol).toLocaleString('de')} kg</span></span></div>
+      <div class="detail-actions"><button class="btn btn--primary" onclick="viewToday()">Ansehen</button><button class="btn" onclick="editToday()">${ICONS.pencil} Bearbeiten</button></div>
+    </section>`;
+  }
+  document.getElementById('start-panel').innerHTML=weekCardHtml(false)+main;
 }
+window.viewToday=()=>showDetail(currentKey);
+window.editToday=()=>{startDraft();render();};
+// The ways to start: a template, last time again, a copy, or empty
+window.openStartModal = function(){
+  const past=trainedKeysBefore(getTodayKey());
+  const row=(icon,title,sub,onclick)=>`<button class="list-row" onclick="${onclick}"><span class="list-ico">${ICONS[icon]}</span><span class="list-main"><span class="list-title">${title}</span><span class="list-sub">${sub}</span></span><span class="chev">${ICONS.chevronRight}</span></button>`;
+  // Date keys are validated (DATE_KEY), safe inside the handler
+  document.getElementById('start-options').innerHTML=`<div class="card list">
+    ${templates.length?row('clipboardList','Aus Vorlage wählen',escapeHtml(templates.map(t=>t.name).join(', ')),"openLoadModal('templates')"):''}
+    ${past.length?row('repeat','Letztes Training wiederholen',shortDate(past[0])+' · '+namesPreview(sessions[past[0]]),`copySessionToToday('${past[0]}')`):''}
+    ${past.length?row('copy','Aus dem Verlauf kopieren','Ein früheres Training als Basis',"openLoadModal('trainings')"):''}
+    ${row('plus','Leer starten','Übungen einzeln hinzufügen','startEmpty()')}
+  </div>`;
+  window.openModal('start-modal-overlay');
+};
+window.startEmpty = function(){
+  window.closeModal('start-modal-overlay');
+  startDraft();render();
+  window.openExerciseModal();
+};
 
 // ── REORDER (drag handle) ──
 // Pointer events: one path for touch and mouse. While dragging, open cards
@@ -820,7 +838,7 @@ exerciseList.addEventListener('lostpointercapture',()=>{
   cancelAnimationFrame(reorder.raf);reorder=null;
   // After a re-render meanwhile the list is in stored order again: no change
   const order=[...exerciseList.children].map(c=>+c.dataset.idx);
-  if(order.some((v,i)=>v!==i)){currentSession.exercises=order.map(i=>currentSession.exercises[i]);scheduleSave();}
+  if(order.some((v,i)=>v!==i)){currentSession.exercises=order.map(i=>currentSession.exercises[i]);storeDraft();}
   exerciseList.classList.remove('reordering');
   render();
 });
@@ -846,33 +864,60 @@ window.updateSet = function(ei,si,field,input){
   if(val!==input.value)input.value=val;
   const ex=currentSession.exercises[ei],setObj=ex.sets[si];
   setObj[field]=val;
-  scheduleSave();updateStats();
+  storeDraft();updateStats();
   const card=document.querySelectorAll('#exercise-list .exercise-card')[ei];
   if(!card)return;
   card.querySelector('.ex-vol b').textContent=Math.round(calcExVol(ex)).toLocaleString('de')+' kg';
-  if(field==='kg'){
-    const pr=getExPR(ex.name);
-    const kg=parseFloat(val)||0,reps=parseFloat(setObj.reps)||0;
-    const isPR=kg>0&&(!pr||kg>pr.kg||(kg===pr.kg&&reps>=pr.reps));
-    const hadPR=input.classList.contains('pr-value');
-    input.classList.toggle('pr-value',isPR);
+  // The mark sits on the kg field; more reps at the best weight count too
+  const kgInput=field==='kg'?input:input.closest?.('.set-row')?.querySelector('.set-input');
+  if(kgInput){
+    const isPR=beatsPR(parseFloat(setObj.kg)||0,parseFloat(setObj.reps)||0,getExPR(ex.name));
+    const hadPR=kgInput.classList.contains('pr-value');
+    kgInput.classList.toggle('pr-value',isPR);
     // Burst the moment a set first crosses the PR threshold
     if(isPR&&!hadPR&&!REDUCED_MOTION)replayAnim(card,'pr-burst');
   }
 };
-window.addSet = function(ei){currentSession.exercises[ei].sets.push({kg:'',reps:''});scheduleSave();render();}
-window.removeSet = function(ei,si){currentSession.exercises[ei].sets.splice(si,1);scheduleSave();render();}
-window.removeEx = function(ei){currentSession.exercises.splice(ei,1);scheduleSave();render();}
+window.addSet = function(ei){currentSession.exercises[ei].sets.push({kg:'',reps:''});storeDraft();render();}
+window.removeSet = function(ei,si){currentSession.exercises[ei].sets.splice(si,1);storeDraft();render();}
+window.removeEx = function(ei){currentSession.exercises.splice(ei,1);storeDraft();render();}
+
+window.toggleDone = function(ei){
+  const ex=currentSession.exercises[ei];
+  ex.done=!ex.done;ex.open=!ex.done; // done collapses, undone reopens
+  storeDraft();render();
+};
+// Wrong template or changed plans: the whole draft goes at once
+window.discardDraft = function(){
+  if(draftChangedElsewhere())return;
+  if(currentSession.exercises.length&&!confirm(draftBase?'Änderungen verwerfen? Das gespeicherte Training bleibt wie es war.':'Training verwerfen? Alle Eingaben gehen verloren.'))return;
+  setDraft(null);dropStoredDraft();render();
+};
 
 // ── FINISH TRAINING ──
+// Only with every exercise done. The draft becomes the stored training of its
+// day; a rejected write (also a late one, once back online) brings it back.
 window.finishTraining = function(){
-  if(!currentSession.exercises.length)return;
-  // Save immediately; the snapshot is taken before collapsing. Offline the
-  // write is queued, the UI does not wait for it (failures raise a toast).
-  saveSession().then(ok=>{if(ok)setSyncStatus('synced','Training gespeichert',3000);});
-  // Collapse all exercises
-  currentSession.exercises.forEach(ex=>ex.open=false);
-  render();
+  if(draftChangedElsewhere())return;
+  const exs=currentSession.exercises;
+  if(!drafting||!activeUid||!exs.length||exs.some(e=>!e.done))return;
+  const key=currentKey,prev=sessions[key];
+  if((stamp(prev)||null)!==draftBase&&!confirm('Für diesen Tag wurde inzwischen ein anderes Training gespeichert (z. B. auf einem anderen Gerät).\n\nOK: deine Version speichern (ersetzt die andere)\nAbbrechen: nicht speichern'))return;
+  const gen=authGen,draft={key,base:draftBase,session:structuredClone(currentSession)};
+  const saved={exercises:exs.map(({done,open,...e})=>structuredClone(e)),notes:currentSession.notes};
+  sessions[key]=saved;invalidatePRCache();syncTemplatesWithBests();
+  trackWrite(()=>setDoc(doc(db,'users',activeUid,'sessions',key),{...saved,writer:CLIENT_ID}),'Training speichern').then(ok=>{
+    if(ok||gen!==authGen)return;
+    if(sessions[key]===saved){if(prev)sessions[key]=prev;else delete sessions[key];invalidatePRCache();}
+    if(!drafting){setDraft(draft);storeDraft();}
+    // A newer draft of this day was built on this save, so it still holds it
+    else if(currentKey===key&&draftBase===stamp(saved)){draftBase=stamp(sessions[key])||null;storeDraft();}
+    else keepLost(key,prev?key:null,saved,{[key]:stamp(prev)});
+    render();
+  });
+  setDraft(null);dropStoredDraft();
+  toast(navigator.onLine?'Training gespeichert':'Training gespeichert – wird synchronisiert, sobald du online bist');
+  animateNextStats=true;render();
   window.scrollTo({top:0,behavior:'smooth'});
 };
 
@@ -972,8 +1017,9 @@ window.addCustomExercise = function(){
   window.addExercise(name);
 };
 window.addExercise = function(name){
+  if(!drafting)startDraft();
   currentSession.exercises.push({name,open:true,sets:newSets(name,currentKey)});
-  scheduleSave();render();window.closeModal('modal-overlay');
+  storeDraft();render();window.closeModal('modal-overlay');
   popInLast('exercise-list');
 };
 
@@ -1083,12 +1129,10 @@ window.deleteSession = function(){
   const dayIdx=(d.getDay()+6)%7;
   const label=DAYS_FULL[dayIdx]+', '+d.getDate()+'. '+monthsFull[d.getMonth()]+' '+d.getFullYear();
   if(!confirm('Training vom '+label+' wirklich löschen?'))return;
-  trackWrite(()=>deleteDoc(doc(db,'users',activeUid,'sessions',key)),'Löschen','Gelöscht');
+  trackWrite(()=>deleteDoc(doc(db,'users',activeUid,'sessions',key)),'Löschen');
   delete sessions[key];
   invalidatePRCache();
   syncTemplatesWithBests();
-  // If deleting the open training, reset currentSession too
-  if(key===currentKey){setCurrentSession(null);render();}
   currentDetailKey=null;
   window.showPage('history');
 };
@@ -1288,8 +1332,9 @@ window.addTplExercise = function(name){
 // An empty day takes it directly; otherwise the user picks add or replace.
 function loadIntoToday(exercises,label){
   pendingImport=exercises.map(e=>({name:e.name,open:true,sets:e.sets.map(s=>({kg:s.kg||'',reps:s.reps||''}))}));
-  window.closeModal('load-modal-overlay');
-  if(!currentSession.exercises.length)return window.doImport('replace');
+  window.closeModal('start-modal-overlay');window.closeModal('load-modal-overlay');
+  // Asks only when the day already has exercises (running or stored)
+  if(!(drafting?currentSession:sessions[getTodayKey()]||{exercises:[]}).exercises.length)return window.doImport('replace');
   document.getElementById('import-modal-title').textContent=`„${label}“ übernehmen`;
   window.openModal('import-modal-overlay');
 }
@@ -1300,21 +1345,22 @@ window.startTemplate = function(id){const t=templates.find(t=>t.id===id);if(t)lo
 window.copySessionToToday = function(key){const s=sessions[key];if(s)loadIntoToday(s.exercises,shortDate(key));};
 window.doImport = function(mode){
   if(!pendingImport)return;
+  if(!drafting)startDraft();
   currentSession.exercises=mode==='replace'?pendingImport:[...currentSession.exercises,...pendingImport];
   pendingImport=null;
-  scheduleSave();window.closeModal('import-modal-overlay');window.showPage('today');
+  storeDraft();window.closeModal('import-modal-overlay');window.showPage('today');
   animateNextStats=true;
   render();
   staggerIn('exercise-list');
 };
-// Picker for templates and earlier trainings; onlyTrainings when the start
-// panel already shows the templates
-window.openLoadModal = function(onlyTrainings){
+// Picker for templates and/or earlier trainings (only: 'templates' | 'trainings')
+window.openLoadModal = function(only){
+  window.closeModal('start-modal-overlay');
   const row=(onclick,title,sub)=>`<button class="pick-row" onclick="${onclick}"><span class="pick-main"><span class="pick-title">${title}</span><span class="pick-sub">${sub}</span></span><span class="chev">${ICONS.chevronRight}</span></button>`;
-  const tpls=onlyTrainings?'':templates.map(t=>row(`startTemplate(${tplRef(t)})`,escapeHtml(t.name),namesPreview(t))).join('');
+  const tpls=only==='trainings'?'':templates.map(t=>row(`startTemplate(${tplRef(t)})`,escapeHtml(t.name),namesPreview(t))).join('');
   // Date keys are validated (DATE_KEY), safe inside the handler
-  const past=trainedKeysBefore(currentKey).map(k=>row(`copySessionToToday('${k}')`,shortDate(k)+' '+k.slice(0,4),namesPreview(sessions[k]))).join('');
-  document.getElementById('load-modal-title').textContent=onlyTrainings?'Training kopieren':'Vorlage oder Training übernehmen';
+  const past=only==='templates'?'':trainedKeysBefore(getTodayKey()).map(k=>row(`copySessionToToday('${k}')`,shortDate(k)+' '+k.slice(0,4),namesPreview(sessions[k]))).join('');
+  document.getElementById('load-modal-title').textContent={templates:'Vorlage wählen',trainings:'Training kopieren'}[only]||'Vorlage oder Training übernehmen';
   document.getElementById('load-options').innerHTML=
     (tpls?`<div class="muscle-label">Vorlagen</div>${tpls}`:'')+
     (past?`<div class="muscle-label">Frühere Trainings</div>${past}`:'')||
@@ -1328,6 +1374,14 @@ let backlogOriginalKey = null; // tracks original date when editing, to delete o
 let backlogSession = {exercises:[], notes:''};
 let backlogSeen = {}; // stamps of the stored trainings the editor started from, by date
 let lostDrafts = {}; // by date: drafts rejected late while another training was open
+// Offered again when its date is opened (history or "nachtragen")
+// ponytail: lost drafts live in memory only, a reload before a late rejection
+// loses them (toast only); persist pending drafts if rejections become real.
+function keepLost(to, from, draft, seen){
+  lostDrafts[to]={from,draft:structuredClone(draft),seen};
+  const d=new Date(to+'T12:00:00');
+  toast(`Training vom ${d.getDate()}. ${monthsFull[d.getMonth()]} nicht gespeichert – öffne den Tag erneut für deinen Entwurf`,true);
+}
 
 function openBacklog(key, originalKey, session, seen={}){
   const lost=lostDrafts[key];
@@ -1412,20 +1466,14 @@ window.saveBacklog = async function(){
   // tap, edits made while waiting) isn't taken for a change on another device
   backlogOriginalKey=to;backlogSeen={[to]:stamp(draft)};
   // Rejected — also later, after the editor was closed
-  // ponytail: lost drafts live in memory only, a reload before a late rejection
-  // loses them (toast only); persist pending drafts if rejections become real.
   const recover=()=>{
     if(gen!==authGen)return;
     // Still open: back to the base before this save
     if(backlogSession===editor){backlogOriginalKey=from;backlogSeen={...backlogSeen,...seen};}
     // Closed: the draft goes back into the editor for a retry
     else if(!backlogKey)openBacklog(to,from,structuredClone(draft),seen);
-    // Another training is open: offered again when its date is opened
-    else{
-      lostDrafts[to]={from,draft:structuredClone(draft),seen};
-      const d=new Date(to+'T12:00:00');
-      setSyncStatus('error',`Training vom ${d.getDate()}. ${monthsFull[d.getMonth()]} nicht gespeichert – öffne den Tag erneut für deinen Entwurf`,3000);
-    }
+    // Another training is open
+    else keepLost(to,from,draft,seen);
   };
   const ok=await settleWrite(tracked);
   if(gen!==authGen)return;
@@ -1435,9 +1483,6 @@ window.saveBacklog = async function(){
   sessions[to]=draft;
   invalidatePRCache();
   syncTemplatesWithBests();
-  // Keep the open training in sync when it was the source or target
-  if(to===currentKey)setCurrentSession(draft);
-  else if(moved&&from===currentKey)setCurrentSession(null);
   render();
   // Only close the editor this save came from, and only while it still shows
   // what was saved — a newer editor or newer edits stay open

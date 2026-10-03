@@ -17,9 +17,9 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="styles.css?v=v3.1.1">
+<link rel="stylesheet" href="styles.css?v=v3.2.0">
 <script>
-var APP_VERSION='v3.1.1';
+var APP_VERSION='v3.2.0';
 // App-shell service worker for offline restarts (sw.js). Registering it
 // replaces any legacy worker at this scope; workers of other apps on the
 // same origin stay untouched.
@@ -56,10 +56,9 @@ if(document.readyState==='loading'){
 
   <div class="page active" id="page-today">
     <header class="page-head">
-      <div class="eyebrow" id="today-date"></div>
-      <h1 class="page-title">Heute</h1>
+      <h1 class="page-title page-title--sm" id="today-date"></h1>
     </header>
-    <!-- Empty day: week progress + ways to start (templates, copy, empty) -->
+    <!-- No training running: week progress + start button, or today's stored training -->
     <div id="start-panel"></div>
     <div id="training-panel">
       <div class="summary">
@@ -70,13 +69,14 @@ if(document.readyState==='loading'){
       <div id="exercise-list"></div>
       <div class="actions">
         <button class="btn" onclick="openExerciseModal()"><span data-icon="plus"></span> Übung</button>
-        <button class="btn" onclick="openLoadModal(false)"><span data-icon="copy"></span> Vorlage / Kopie</button>
+        <button class="btn" onclick="openLoadModal()"><span data-icon="copy"></span> Vorlage / Kopie</button>
       </div>
       <div class="sec-label">Notizen</div>
       <textarea class="notes" id="notes" maxlength="2000" placeholder="Wie lief das Training…"></textarea>
+      <button class="link-btn link-btn--danger" onclick="discardDraft()"><span data-icon="trash"></span> Training verwerfen</button>
       <div class="savebar">
-        <div class="sync-bar" id="sync-bar">Alles gesichert</div>
-        <button class="btn btn--primary" id="finish-btn" onclick="finishTraining()"><span data-icon="check"></span> Speichern</button>
+        <div class="draft-progress" id="draft-progress"></div>
+        <button class="btn btn--primary" id="finish-btn" onclick="finishTraining()"><span data-icon="check"></span> Abschließen</button>
       </div>
     </div>
   </div>
@@ -204,7 +204,7 @@ if(document.readyState==='loading'){
   <button class="nav-btn" id="nav-progress" onclick="showPage('progress')"><span class="nav-icon"><span data-icon="barChart"></span></span>Stats</button>
 </nav>
 
-<div class="sync-toast" id="sync-toast" role="alert"></div>
+<div class="sync-toast" id="sync-toast" role="status"></div>
 
 <!-- MODALS -->
 <div class="modal-overlay" id="modal-overlay" onclick="closeModalOnOverlay(event,'modal-overlay')">
@@ -216,6 +216,14 @@ if(document.readyState==='loading'){
       <button class="btn btn--primary btn--sm custom-add-btn" id="custom-btn" onclick="addCustomExercise()">+ Neu</button>
     </div>
     <div id="exercise-options"></div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="start-modal-overlay" onclick="closeModalOnOverlay(event,'start-modal-overlay')">
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="start-modal-title" onclick="event.stopPropagation()">
+    <button class="modal-close" onclick="closeModal('start-modal-overlay')" aria-label="Schließen"><span data-icon="x"></span></button>
+    <div class="modal-title" id="start-modal-title">Training starten</div>
+    <div id="start-options"></div>
   </div>
 </div>
 
@@ -288,6 +296,6 @@ if(document.readyState==='loading'){
   </div>
 </div>
 
-<script type="module" src="app.js?v=v3.1.1"></script>
+<script type="module" src="app.js?v=v3.2.0"></script>
 </body>
 </html>
