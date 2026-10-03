@@ -304,7 +304,7 @@ test('R2 a stale past-training or template editor asks before overwriting', asyn
   let asked = 0;
   b.context.confirm = () => { asked++; return false; };
   a.run("currentDetailKey='2026-09-30';editSession();");
-  b.run("currentDetailKey='2026-09-30';editSession();openTemplateEditor(0);");
+  b.run("currentDetailKey='2026-09-30';editSession();openTemplateEditor(1);");
   a.run("addBacklogExercise('Remote')");
   await a.run('saveBacklog()');
   b.context.document.getElementById('backlog-notes').value = 'Local';
@@ -312,7 +312,7 @@ test('R2 a stale past-training or template editor asks before overwriting', asyn
   assert.equal(asked, 1);
   assert.equal(srv.docs.get('users/A/sessions/2026-09-30').exercises.length, 2);
   assert.equal(b.run('backlogKey'), '2026-09-30'); // declined: editor and draft stay
-  a.run("openTemplateEditor(0);addTplExercise('Remote');");
+  a.run("openTemplateEditor(1);addTplExercise('Remote');");
   a.context.document.getElementById('tpl-name-input').value = 'Push';
   await a.run('saveTemplate()');
   b.context.document.getElementById('tpl-name-input').value = 'Local';
@@ -411,7 +411,7 @@ test('S2 edits made while saving stay in the editor; saving twice is no conflict
   assert.equal(r.run('backlogKey'), null);
   // A rejected save puts the editor back on its old base: retrying is no conflict either
   r.setMode('reject');
-  r.run("openTemplateEditor(0);updateTplSet(0,0,'kg',{value:'100'});");
+  r.run("openTemplateEditor(templates[0].id);updateTplSet(0,0,'kg',{value:'100'});");
   await r.run('saveTemplate()');
   r.setMode('ok');
   await r.run('saveTemplate()');
@@ -505,13 +505,37 @@ test('V3 a template picker shown before a deletion elsewhere still loads the rig
   await a.login('A'); await b.login('A');
   b.run('openLoadModal(false)');
   const rows = b.nodes.get('load-options').innerHTML.match(/startTemplate\([^)]*\)/g);
-  a.run('deleteTemplate(0)'); // Push deleted on another device while b's picker is open
+  a.run('deleteTemplate(1)'); // Push deleted on another device while b's picker is open
   await new Promise(r => setImmediate(r));
   assert.equal(b.run('templates.map(t=>t.name).join()'), 'Pull');
   b.run(rows[0]); // the shown "Push" row must not load Pull
   assert.equal(b.run('currentSession.exercises.length'), 0);
   b.run(rows[1]);
   assert.equal(b.run('currentSession.exercises[0].name'), 'Klimmzüge');
+});
+
+test('V3 tapping a template shows it; start, edit and delete from there', async () => {
+  const srv = server();
+  srv.docs.set('users/A/data/templates', {list: [
+    {id: 2, name: 'Pull', exercises: [{name: 'Klimmzüge', sets: [{kg: '0', reps: '8'}]}]},
+    {id: 1, name: 'Push', exercises: [{name: 'Bankdrücken', sets: [{kg: '80', reps: '8'}, {kg: '', reps: ''}]}]}]});
+  const r = runtime(srv);
+  await r.login('A');
+  r.run("showPage('templates')");
+  r.nodes.get('page-templates').classList.remove('active'); // the fake DOM never deactivates pages
+  r.nodes.get('template-list').children[1].onclick();
+  assert.ok(r.nodes.get('page-tpl-detail').classList.contains('active'));
+  assert.ok(!r.nodes.get('tpl-editor-overlay')?.classList.contains('open')); // a tap shows, it doesn't edit
+  assert.equal(r.nodes.get('tpl-detail-title').textContent, 'Push');
+  assert.equal(r.nodes.get('tpl-detail-exercises').children[0].innerHTML.match(/ro-row/g).length, 2); // planned (empty) sets too
+  assert.match(r.nodes.get('tpl-detail-actions').innerHTML, /startTemplate\(1\)/);
+  r.context.document.querySelector = q => q === '.page.active' ? {id: 'page-tpl-detail'} : null;
+  r.run("openTemplateEditor(1);updateTplSet(0,0,'kg',{value:'85'});");
+  await r.run('saveTemplate()');
+  assert.match(r.nodes.get('tpl-detail-exercises').lastElementChild.innerHTML, /85 kg/); // saved edit shows at once
+  r.run('deleteTemplate(1)');
+  assert.ok(r.nodes.get('page-templates').classList.contains('active'));
+  assert.deepEqual(srv.docs.get('users/A/data/templates').list.map(t => t.name), ['Pull']);
 });
 
 test('V3 notes without exercises stay reachable (today and history)', async () => {

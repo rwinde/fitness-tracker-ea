@@ -2,7 +2,7 @@
 
 Ein mobiler Fitness-/Krafttraining-Tracker als Progressive Web App: Trainings­einheiten mit Übungen, Sätzen (kg × Wiederholungen) und Notizen erfassen, Vorlagen verwalten, Wochenziele verfolgen und Fortschritt (PRs, Heatmap, Gewichtsentwicklung) auswerten. Anmeldung per Google-Konto, Daten liegen in Firebase.
 
-**Bedienung in Kürze:** Ein leerer Tag zeigt auf „Heute“ den Wochenfortschritt und die Startoptionen: Vorlage starten, letztes Training wiederholen, ein früheres Training aus dem Verlauf kopieren oder leer starten. Vorlagen und Kopien übernehmen die Werte (kg/Wdh); ist der Tag schon befüllt, fragt die App „Hinzufügen“ oder „Ersetzen“. Eine einzeln hinzugefügte Übung startet mit so vielen Sätzen wie beim letzten Mal (nur Sätze mit Werten zählen, sonst 2), die alten Werte stehen als Platzhalter in den leeren Feldern. Jeder Satz lässt sich per × löschen. Gespeichert wird automatisch; die Leiste unten zeigt den Status, „Speichern“ sichert sofort. Darstellung: Auto (System), Hell oder Dunkel im Profilmenü.
+**Bedienung in Kürze:** Ein leerer Tag zeigt auf „Heute“ den Wochenfortschritt und die Startoptionen: Vorlage starten, letztes Training wiederholen, ein früheres Training aus dem Verlauf kopieren oder leer starten. Vorlagen und Kopien übernehmen die Werte (kg/Wdh); ist der Tag schon befüllt, fragt die App „Hinzufügen“ oder „Ersetzen“. Eine einzeln hinzugefügte Übung startet mit so vielen Sätzen wie beim letzten Mal (nur Sätze mit Werten zählen, sonst 2), die alten Werte stehen als Platzhalter in den leeren Feldern. Jeder Satz lässt sich per × löschen. Ein Tipp auf eine Vorlage zeigt sie an; Starten, Bearbeiten und Löschen gehen von dort. Gespeichert wird automatisch; die Leiste unten zeigt den Status, „Speichern“ sichert sofort. Darstellung: Auto (System), Hell oder Dunkel im Profilmenü.
 
 ## Architektur
 
@@ -14,7 +14,8 @@ Bewusst minimal gehalten — **kein Build-Schritt, keine Abhängigkeiten außer 
 | `app.js` | Gesamte Anwendungslogik (Auth, Firestore, Rendering, Seiten) |
 | `styles.css` | Alle Styles inkl. Light-/Dark-Theme über CSS-Variablen |
 | `sw.js` | Service Worker: App-Shell-Cache für Offline-Neustarts |
-| `icon.png` | App-Icon |
+| `icon.png` | App-Icon (Homescreen, Login) |
+| `favicon.svg`, `favicon.png` | Browser-Favicon (PNG für Browser ohne SVG-Favicons) |
 | `tests/regression.cjs` | Regressionstests (Node, ohne Abhängigkeiten) |
 
 Die App ist eine klassische Single-Page-App: Seiten sind `<div class="page">`-Container, `showPage(name)` blendet sie um. Interaktive Elemente rufen globale `window.*`-Funktionen über Inline-Handler auf.

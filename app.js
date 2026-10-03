@@ -372,6 +372,7 @@ function refreshActivePage() {
   if(page === 'page-today' && !currentSession.exercises.length) render();
   else if(page === 'page-history') renderHistory();
   else if(page === 'page-templates') renderTemplates();
+  else if(page === 'page-tpl-detail') renderTemplateDetail();
   else if(page === 'page-progress') renderProgress();
 }
 
@@ -512,13 +513,13 @@ window.addEventListener('resize',()=>{
 
 // ── PAGE NAV ──
 // Containers whose children get a staggered entrance on page entry
-const PAGE_STAGGER={today:['exercise-list','start-panel'],history:['history-list'],templates:['template-list'],detail:['detail-exercises']};
+const PAGE_STAGGER={today:['exercise-list','start-panel'],history:['history-list'],templates:['template-list'],detail:['detail-exercises'],'tpl-detail':['tpl-detail-exercises']};
 window.showPage = function(name) {
   document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
   document.querySelectorAll('.nav-btn').forEach(b=>b.classList.remove('active'));
   const page=document.getElementById('page-'+name);
   page.classList.add('active');
-  const navId = name==='detail'||name==='backlog'?'nav-history':('nav-'+name);
+  const navId = name==='detail'||name==='backlog'?'nav-history':name==='tpl-detail'?'nav-templates':('nav-'+name);
   document.getElementById(navId)?.classList.add('active');
   if(name==='today') render();
   if(name==='history') renderHistory();
@@ -658,6 +659,7 @@ function renderExerciseCard(ex,opts){
     idx=0,
     draggable=false,
     readonly=false,
+    allSets=false,
     showDelete=false,
     namespace='today',
     badgeHtml='',
@@ -672,7 +674,7 @@ function renderExerciseCard(ex,opts){
   if(readonly){
     // Sets left empty (planned, not done) are not shown
     const rows=ex.sets.map((set,i)=>{
-      if(!set.kg&&!set.reps)return '';
+      if(!allSets&&!set.kg&&!set.reps)return '';
       const setKg=parseFloat(set.kg)||0,setReps=parseFloat(set.reps)||0;
       const sv=setKg*setReps;
       return `<div class="ro-row${isPRSet(i,setKg,setReps)?' pr-row':''}"><span class="set-no">${i+1}</span><span>${escapeHtml(set.kg||'–')} kg</span><span>× ${escapeHtml(set.reps||'–')}</span><span class="ro-vol">${sv>0?Math.round(sv).toLocaleString('de'):'–'}</span></div>`;
@@ -1171,26 +1173,46 @@ function renderTemplates(){
   const list=document.getElementById('template-list');
   if(!templates.length){list.innerHTML=renderEmpty('clipboardList','Noch keine Vorlagen','Erstelle deine erste Vorlage.');return;}
   list.innerHTML='';
-  templates.forEach((tpl,ti)=>{
+  templates.forEach(tpl=>{
     const card=document.createElement('div');card.className='card template-card';
-    card.innerHTML=`
+    card.setAttribute('role','button');card.tabIndex=0;
+    card.onclick=()=>showTemplateDetail(tpl.id);
+    card.innerHTML=`<div class="template-main">
       <div class="template-name">${escapeHtml(tpl.name)}</div>
       <div class="template-meta">${tpl.exercises.length} Übungen · ${setsLabel(tpl.exercises.reduce((s,e)=>s+e.sets.length,0))}</div>
-      <div class="template-ex">${namesPreview(tpl)}</div>
-      <div class="template-actions">
-        <button class="btn btn--primary btn--sm" onclick="startTemplate(${tplRef(tpl)})">${ICONS.play} Starten</button>
-        <button class="btn btn--sm" onclick="openTemplateEditor(${ti})">${ICONS.pencil} Bearbeiten</button>
-        <button class="btn btn--sm btn--danger" onclick="deleteTemplate(${ti})" aria-label="Vorlage löschen">${ICONS.trash}</button>
-      </div>`;
+      <div class="template-ex">${namesPreview(tpl)}</div></div>
+      <span class="chev">${ICONS.chevronRight}</span>`;
     list.appendChild(card);
   });
 }
-window.deleteTemplate = function(ti){
-  if(!confirm(`Vorlage "${templates[ti].name}" wirklich löschen?`))return;
-  templates.splice(ti,1);renderTemplates();saveTemplates();
+// ── TEMPLATE DETAIL ──
+// Read-only view; start, edit and delete from here. By id, so a change on
+// another device shows up (refreshActivePage) and a deletion leads back.
+let currentTplId=null;
+function showTemplateDetail(id){currentTplId=id;if(renderTemplateDetail())window.showPage('tpl-detail');}
+function renderTemplateDetail(){
+  const t=templates.find(t=>t.id===currentTplId);
+  if(!t){window.showPage('templates');return false;}
+  const ref=tplRef(t);
+  document.getElementById('tpl-detail-title').textContent=t.name;
+  document.getElementById('tpl-detail-actions').innerHTML=`<button class="btn btn--primary" onclick="startTemplate(${ref})">${ICONS.play} Starten</button>
+    <button class="btn" onclick="openTemplateEditor(${ref})" aria-label="Vorlage bearbeiten">${ICONS.pencil}</button>
+    <button class="btn btn--danger" onclick="deleteTemplate(${ref})" aria-label="Vorlage löschen">${ICONS.trash}</button>`;
+  const vals=[t.exercises.length,t.exercises.reduce((n,e)=>n+e.sets.length,0),Math.round(t.exercises.reduce((v,e)=>v+calcExVol(e),0))];
+  document.getElementById('tpl-detail-stats').innerHTML=['Übungen','Sätze','kg Volumen']
+    .map((label,i)=>`<div class="summary-item"><b>${vals[i].toLocaleString('de')}</b><span>${label}</span></div>`).join('');
+  const exEl=document.getElementById('tpl-detail-exercises');exEl.innerHTML='';
+  t.exercises.forEach(ex=>exEl.appendChild(renderExerciseCard(ex,{readonly:true,allSets:true})));
+  return true;
+}
+window.deleteTemplate = function(id){
+  const t=templates.find(t=>t.id===id);
+  if(!t||!confirm(`Vorlage "${t.name}" wirklich löschen?`))return;
+  templates=templates.filter(x=>x!==t);saveTemplates();window.showPage('templates');
 };
-window.openTemplateEditor = function(ti){
-  showTemplateEditor(ti===null?{id:Date.now(),name:'',exercises:[]}:structuredClone(templates[ti]));
+window.openTemplateEditor = function(id){
+  const t=id===null?{id:Date.now(),name:'',exercises:[]}:templates.find(t=>t.id===id);
+  if(t)showTemplateEditor(structuredClone(t));
 };
 // Remembers the stored version, so a save can tell if it changed elsewhere meanwhile
 function showTemplateEditor(tpl){
@@ -1240,7 +1262,7 @@ window.saveTemplate = async function(){
     const open=document.getElementById('tpl-editor-overlay').classList.contains('open');
     if(gen!==authGen||open&&editingTemplate!==editor)return;
     templates=old?templates.map(t=>t.id===draft.id?old:t):templates.filter(t=>t.id!==draft.id);
-    renderTemplates();
+    refreshActivePage();
     if(open)tplSeen=seen;
     else showTemplateEditor(draft);
   };
@@ -1252,7 +1274,7 @@ window.saveTemplate = async function(){
   // what was saved — a newer editor or newer edits stay open
   const shown={...editor,name:document.getElementById('tpl-name-input').value.trim()};
   if(editingTemplate===editor&&stamp(shown)===stamp(draft)){editingTemplate=null;window.closeModal('tpl-editor-overlay');}
-  renderTemplates();
+  refreshActivePage();
 };
 window.openTplExModal = function(){
   window.openModal('tpl-ex-modal-overlay');

@@ -10,15 +10,16 @@
 <meta name="theme-color" content="#0a0a0b" media="(prefers-color-scheme: dark)">
 <title>Fitness Tracker</title>
 <link rel="manifest" href="manifest.json">
-<link rel="icon" type="image/png" href="icon.png">
+<link rel="icon" type="image/svg+xml" href="favicon.svg">
+<link rel="icon" type="image/png" sizes="64x64" href="favicon.png">
 <link rel="apple-touch-icon" sizes="180x180" href="icon.png">
 <meta name="apple-mobile-web-app-title" content="Fitness">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="styles.css?v=v3.0.0">
+<link rel="stylesheet" href="styles.css?v=v3.1.0">
 <script>
-var APP_VERSION='v3.0.0';
+var APP_VERSION='v3.1.0';
 // App-shell service worker for offline restarts (sw.js). Registering it
 // replaces any legacy worker at this scope; workers of other apps on the
 // same origin stay untouched.
@@ -126,6 +127,17 @@ if(document.readyState==='loading'){
     <header class="page-head"><h1 class="page-title">Vorlagen</h1></header>
     <button class="btn btn--block list-top-btn" onclick="openTemplateEditor(null)"><span data-icon="plus"></span> Neue Vorlage</button>
     <div id="template-list"></div>
+  </div>
+
+  <div class="page" id="page-tpl-detail">
+    <button class="back" onclick="showPage('templates')"><span data-icon="chevronLeft"></span> Vorlagen</button>
+    <header class="page-head">
+      <div class="eyebrow">Vorlage</div>
+      <h1 class="page-title page-title--sm" id="tpl-detail-title"></h1>
+    </header>
+    <div class="detail-actions" id="tpl-detail-actions"></div>
+    <div class="summary" id="tpl-detail-stats"></div>
+    <div id="tpl-detail-exercises"></div>
   </div>
 
   <div class="page" id="page-progress">
@@ -276,6 +288,6 @@ if(document.readyState==='loading'){
   </div>
 </div>
 
-<script type="module" src="app.js?v=v3.0.0"></script>
+<script type="module" src="app.js?v=v3.1.0"></script>
 </body>
 </html>

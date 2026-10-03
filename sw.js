@@ -6,7 +6,7 @@
 // ponytail: no precache — offline restarts work from the second online launch
 // after this worker was installed; add an install-time precache if that's too late.
 const CACHE = 'fitness-shell';
-const SHELL = ['', 'index.html', 'app.js', 'styles.css', 'manifest.json', 'icon.png'];
+const SHELL = ['', 'index.html', 'app.js', 'styles.css', 'manifest.json', 'icon.png', 'favicon.svg', 'favicon.png'];
 const CDN = ['https://www.gstatic.com/firebasejs/', 'https://fonts.googleapis.com/', 'https://fonts.gstatic.com/'];
 
 self.addEventListener('install', () => self.skipWaiting());
